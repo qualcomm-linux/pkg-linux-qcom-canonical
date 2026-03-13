@@ -265,6 +265,9 @@ struct iris_platform_data {
 	const struct iris_firmware_desc *firmware_desc;
 
 	const struct vpu_ops *vpu_ops;
+
+	int (*init_cb_devs)(struct iris_core *core);
+	void (*deinit_cb_devs)(struct iris_core *core);
 	const struct icc_info *icc_tbl;
 	unsigned int icc_tbl_size;
 	const struct bw_info *bw_tbl_dec;
