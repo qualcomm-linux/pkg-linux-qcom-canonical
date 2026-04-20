@@ -101,7 +101,7 @@ jobs:
       # 2. Checkout the suite branch (contains the full kernel source tree)
       # -----------------------------------------------------------------------
       - name: Checkout suite branch (${{ inputs.suite || 'noble' }})
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ inputs.suite || 'noble' }}
           path: kernel-src
@@ -119,7 +119,7 @@ jobs:
       # -----------------------------------------------------------------------
       - name: Checkout docker-pkg-build
         if: env.BUILD_MODE == 'docker'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: qualcomm-linux/docker-pkg-build
           ref: main
