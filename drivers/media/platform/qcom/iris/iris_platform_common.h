@@ -306,6 +306,7 @@ struct iris_platform_data {
 	u32 max_core_mbpf;
 	/* max number of macroblocks per second supported */
 	u32 max_core_mbps;
+	bool dual_core;
 };
 
 #endif
