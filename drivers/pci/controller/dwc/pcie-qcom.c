@@ -26,7 +26,6 @@
 #include <linux/pci-ecam.h>
 #include <linux/pci-pwrctrl.h>
 #include <linux/pm_opp.h>
-#include <linux/pm_domain.h>
 #include <linux/pm_runtime.h>
 #include <linux/platform_device.h>
 #include <linux/phy/pcie.h>
@@ -72,6 +71,7 @@
 
 /* ELBI registers */
 #define ELBI_SYS_CTRL				0x04
+#define ELBI_SYS_STTS				0x08
 
 /* DBI registers */
 #define AXI_MSTR_RESP_COMP_CTRL0		0x818
@@ -146,7 +146,9 @@
 
 /* ELBI_SYS_CTRL register fields */
 #define ELBI_SYS_CTRL_LT_ENABLE			BIT(0)
-#define ELBI_SYS_CTRL_PME_TURNOFF_MSG		BIT(4)
+
+/* ELBI_SYS_STTS register fields */
+#define ELBI_SYS_STTS_LTSSM_STATE_MASK		GENMASK(17, 12)
 
 /* AXI_MSTR_RESP_COMP_CTRL0 register fields */
 #define CFG_REMOTE_RD_REQ_BRIDGE_SIZE_2K	0x4
@@ -248,6 +250,7 @@ struct qcom_pcie_ops {
 	void (*deinit)(struct qcom_pcie *pcie);
 	void (*ltssm_enable)(struct qcom_pcie *pcie);
 	int (*config_sid)(struct qcom_pcie *pcie);
+	enum dw_pcie_ltssm (*get_ltssm)(struct qcom_pcie *pcie);
 };
 
  /**
@@ -285,6 +288,7 @@ struct qcom_pcie {
 	const struct qcom_pcie_cfg *cfg;
 	struct dentry *debugfs;
 	struct list_head ports;
+	bool suspended;
 	bool use_pm_opp;
 };
 
@@ -423,6 +427,15 @@ static void qcom_pcie_2_1_0_ltssm_enable(struct qcom_pcie *pcie)
 	val = readl(pci->elbi_base + ELBI_SYS_CTRL);
 	val |= ELBI_SYS_CTRL_LT_ENABLE;
 	writel(val, pci->elbi_base + ELBI_SYS_CTRL);
+}
+
+static enum dw_pcie_ltssm qcom_pcie_2_1_0_get_ltssm(struct qcom_pcie *pcie)
+{
+	struct dw_pcie *pci = pcie->pci;
+	u32 val;
+
+	val = readl(pci->elbi_base + ELBI_SYS_STTS);
+	return (enum dw_pcie_ltssm)FIELD_GET(ELBI_SYS_STTS_LTSSM_STATE_MASK, val);
 }
 
 static int qcom_pcie_get_resources_2_1_0(struct qcom_pcie *pcie)
@@ -1066,12 +1079,6 @@ static void qcom_pcie_host_post_init_2_7_0(struct qcom_pcie *pcie)
 static void qcom_pcie_deinit_2_7_0(struct qcom_pcie *pcie)
 {
 	struct qcom_pcie_resources_2_7_0 *res = &pcie->res.v2_7_0;
-	u32 val;
-
-	/* Disable PCIe clocks and resets */
-	val = readl(pcie->parf + PARF_PHY_CTRL);
-	val |= PHY_TEST_PWR_DOWN;
-	writel(val, pcie->parf + PARF_PHY_CTRL);
 
 	clk_bulk_disable_unprepare(res->num_clks, res->clks);
 
@@ -1268,7 +1275,11 @@ static enum dw_pcie_ltssm qcom_pcie_get_ltssm(struct dw_pcie *pci)
 	struct qcom_pcie *pcie = to_qcom_pcie(pci);
 	u32 val;
 
+	if (pcie->cfg->ops->get_ltssm)
+		return pcie->cfg->ops->get_ltssm(pcie);
+
 	val = readl(pcie->parf + PARF_LTSSM);
+
 	return (enum dw_pcie_ltssm)FIELD_GET(PARF_LTSSM_STATE_MASK, val);
 }
 
@@ -1380,33 +1391,14 @@ static void qcom_pcie_host_post_init(struct dw_pcie_rp *pp)
 	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
 	struct qcom_pcie *pcie = to_qcom_pcie(pci);
 
-	/*
-	 * During system suspend, the Qcom RC driver may turn off the PHY and
-	 * remove votes to save power. If the endpoint asserts CLKREQ# to
-	 * exit L1ss, the time required to wake the system and restore the
-	 * PHY/refclk exceeds the strict L1ss exit timing, resulting in Link
-	 * Down (LDn). Set this flag to indicate this limitation to client
-	 * drivers so that they will avoid relying on L1ss during system
-	 * suspend.
-	 */
-	pp->bridge->broken_l1ss_resume = true;
-
 	if (pcie->cfg->ops->host_post_init)
 		pcie->cfg->ops->host_post_init(pcie);
-}
-
-static void qcom_pcie_host_pme_turn_off(struct dw_pcie_rp *pp)
-{
-	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
-
-	writel(ELBI_SYS_CTRL_PME_TURNOFF_MSG, pci->elbi_base + ELBI_SYS_CTRL);
 }
 
 static const struct dw_pcie_host_ops qcom_pcie_dw_ops = {
 	.init		= qcom_pcie_host_init,
 	.deinit		= qcom_pcie_host_deinit,
 	.post_init	= qcom_pcie_host_post_init,
-	.pme_turn_off	= qcom_pcie_host_pme_turn_off,
 };
 
 /* Qcom IP rev.: 2.1.0	Synopsys IP rev.: 4.01a */
@@ -1416,6 +1408,7 @@ static const struct qcom_pcie_ops ops_2_1_0 = {
 	.post_init = qcom_pcie_post_init_2_1_0,
 	.deinit = qcom_pcie_deinit_2_1_0,
 	.ltssm_enable = qcom_pcie_2_1_0_ltssm_enable,
+	.get_ltssm = qcom_pcie_2_1_0_get_ltssm,
 };
 
 /* Qcom IP rev.: 1.0.0	Synopsys IP rev.: 4.11a */
@@ -1425,6 +1418,7 @@ static const struct qcom_pcie_ops ops_1_0_0 = {
 	.post_init = qcom_pcie_post_init_1_0_0,
 	.deinit = qcom_pcie_deinit_1_0_0,
 	.ltssm_enable = qcom_pcie_2_1_0_ltssm_enable,
+	.get_ltssm = qcom_pcie_2_1_0_get_ltssm,
 };
 
 /* Qcom IP rev.: 2.3.2	Synopsys IP rev.: 4.21a */
@@ -2071,56 +2065,53 @@ static int qcom_pcie_suspend_noirq(struct device *dev)
 	if (!pcie)
 		return 0;
 
-	ret = dw_pcie_suspend_noirq(pcie->pci);
-	if (ret)
-		return ret;
+	/*
+	 * Set minimum bandwidth required to keep data path functional during
+	 * suspend.
+	 */
+	if (pcie->icc_mem) {
+		ret = icc_set_bw(pcie->icc_mem, 0, kBps_to_icc(1));
+		if (ret) {
+			dev_err(dev,
+				"Failed to set bandwidth for PCIe-MEM interconnect path: %d\n",
+				ret);
+			return ret;
+		}
+	}
 
-	if (pcie->pci->suspended)
-		dev_pm_genpd_rpm_always_on(dev, false);
-	else
-		dev_pm_genpd_rpm_always_on(dev, true);
+	/*
+	 * Turn OFF the resources only for controllers without active PCIe
+	 * devices. For controllers with active devices, the resources are kept
+	 * ON and the link is expected to be in L0/L1 (sub)states.
+	 *
+	 * Turning OFF the resources for controllers with active PCIe devices
+	 * will trigger access violation during the end of the suspend cycle,
+	 * as kernel tries to access the PCIe devices config space for masking
+	 * MSIs.
+	 *
+	 * Also, it is not desirable to put the link into L2/L3 state as that
+	 * implies VDD supply will be removed and the devices may go into
+	 * powerdown state. This will affect the lifetime of the storage devices
+	 * like NVMe.
+	 */
+	if (!dw_pcie_link_up(pcie->pci)) {
+		qcom_pcie_host_deinit(&pcie->pci->pp);
+		pcie->suspended = true;
+	}
 
-	if (pcie->pci->suspended) {
-		ret = icc_disable(pcie->icc_mem);
-		if (ret)
-			dev_err(dev, "Failed to disable PCIe-MEM interconnect path: %d\n", ret);
-
+	/*
+	 * Only disable CPU-PCIe interconnect path if the suspend is non-S2RAM.
+	 * Because on some platforms, DBI access can happen very late during the
+	 * S2RAM and a non-active CPU-PCIe interconnect path may lead to NoC
+	 * error.
+	 */
+	if (pm_suspend_target_state != PM_SUSPEND_MEM) {
 		ret = icc_disable(pcie->icc_cpu);
 		if (ret)
 			dev_err(dev, "Failed to disable CPU-PCIe interconnect path: %d\n", ret);
 
 		if (pcie->use_pm_opp)
 			dev_pm_opp_set_opp(pcie->pci->dev, NULL);
-	} else {
-		/*
-		 * Set minimum bandwidth required to keep data path functional during
-		 * suspend.
-		 */
-		if (pcie->icc_mem) {
-			ret = icc_set_bw(pcie->icc_mem, 0, kBps_to_icc(1));
-			if (ret) {
-				dev_err(dev,
-					"Failed to set bandwidth for PCIe-MEM interconnect path: %d\n",
-					ret);
-				return ret;
-			}
-		}
-
-		/*
-		 * Only disable CPU-PCIe interconnect path if the suspend is non-S2RAM.
-		 * Because on some platforms, DBI access can happen very late during the
-		 * S2RAM and a non-active CPU-PCIe interconnect path may lead to NoC
-		 * error.
-		 */
-		if (pm_suspend_target_state != PM_SUSPEND_MEM) {
-			ret = icc_disable(pcie->icc_cpu);
-			if (ret)
-				dev_err(dev, "Failed to disable CPU-PCIe interconnect path: %d\n",
-					ret);
-
-			if (pcie->use_pm_opp)
-				dev_pm_opp_set_opp(pcie->pci->dev, NULL);
-		}
 	}
 	return ret;
 }
@@ -2134,30 +2125,20 @@ static int qcom_pcie_resume_noirq(struct device *dev)
 	if (!pcie)
 		return 0;
 
-	if (pcie->pci->suspended) {
+	if (pm_suspend_target_state != PM_SUSPEND_MEM) {
 		ret = icc_enable(pcie->icc_cpu);
 		if (ret) {
 			dev_err(dev, "Failed to enable CPU-PCIe interconnect path: %d\n", ret);
 			return ret;
 		}
+	}
 
-		ret = icc_enable(pcie->icc_mem);
-		if (ret) {
-			dev_err(dev, "Failed to enable PCIe-MEM interconnect path: %d\n", ret);
+	if (pcie->suspended) {
+		ret = qcom_pcie_host_init(&pcie->pci->pp);
+		if (ret)
 			return ret;
-		}
-		ret = dw_pcie_resume_noirq(pcie->pci);
-		if (ret && (ret != -ETIMEDOUT))
-			return ret;
-	} else {
-		if (pm_suspend_target_state != PM_SUSPEND_MEM) {
-			ret = icc_enable(pcie->icc_cpu);
-			if (ret) {
-				dev_err(dev, "Failed to enable CPU-PCIe interconnect path: %d\n",
-					ret);
-				return ret;
-			}
-		}
+
+		pcie->suspended = false;
 	}
 
 	qcom_pcie_icc_opp_update(pcie);
