@@ -36,6 +36,7 @@ properties:
         - nvidia,tegra234-sysram
         - qcom,kaanapali-imem
         - qcom,rpm-msg-ram
+        - qcom,shikra-imem
         - rockchip,rk3288-pmu-sram
 
   reg:
