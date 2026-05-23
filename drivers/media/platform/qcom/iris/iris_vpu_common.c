@@ -485,7 +485,7 @@ int iris_vpu_power_on(struct iris_core *core)
 
 	iris_opp_set_rate(core->dev, freq);
 
-	iris_vpu_set_preset_registers(core);
+	core->iris_platform_data->set_preset_registers(core);
 
 	iris_vpu_interrupt_init(core);
 	core->intr_status = 0;
@@ -501,9 +501,4 @@ err:
 	dev_err(core->dev, "power on failed\n");
 
 	return ret;
-}
-
-void iris_vpu_set_preset_registers(struct iris_core *core)
-{
-	writel(0x0, core->reg_base + 0xb0088);
 }
