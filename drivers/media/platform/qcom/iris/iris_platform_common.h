@@ -65,9 +65,6 @@ enum platform_clk_type {
 	IRIS_VPP0_HW_CLK,
 	IRIS_VPP1_HW_CLK,
 	IRIS_APV_HW_CLK,
-	IRIS_AXI_VCODEC1_CLK,
-	IRIS_VCODEC1_CLK,
-	IRIS_VCODEC1_FREERUN_CLK,
 };
 
 struct platform_clk_data {
@@ -217,7 +214,6 @@ enum platform_pm_domain_type {
 	IRIS_VPP0_HW_POWER_DOMAIN,
 	IRIS_VPP1_HW_POWER_DOMAIN,
 	IRIS_APV_HW_POWER_DOMAIN,
-	IRIS_VCODEC1_POWER_DOMAIN,
 };
 
 struct iris_firmware_data {
