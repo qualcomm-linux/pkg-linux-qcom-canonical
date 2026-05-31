@@ -690,6 +690,26 @@ enum ufshcd_quirks {
 	 * because it causes link startup to become unreliable.
 	 */
 	UFSHCD_QUIRK_PERFORM_LINK_STARTUP_ONCE		= 1 << 26,
+
+	/*
+	 * On some platforms, the VCC regulator has a slow ramp-up time. Add a
+	 * delay after enabling VCC to ensure it's stable.
+	 */
+	UFSHCD_QUIRK_VCC_ON_DELAY			= 1 << 27,
+
+	/*
+	 * Some UFS devices keep drawing larger current after reset is
+	 * asserted until it is deasserted. Asserting device reset
+	 * during UFS power down causes the device firmware to wake up and
+	 * execute its reset routine, drawing current beyond the permissible
+	 * limit for low-power mode (LPM). This may trigger an OCP fault on
+	 * the regulator supplying power to UFS.
+	 *
+	 * Enable this quirk to skip asserting device reset during UFS power
+	 * down. This is handled only in shutdown; the device reset will be
+	 * asserted as part of the platform shutdown sequence.
+	 */
+	UFSHCD_QUIRK_SKIP_DEVICE_RESET			= 1 << 28,
 };
 
 enum ufshcd_caps {
