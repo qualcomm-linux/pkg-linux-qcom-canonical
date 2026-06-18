@@ -159,7 +159,7 @@ jobs:
       #    fetch-source-pkg.yml — they are not the main branch.
       # -----------------------------------------------------------------------
       - name: Checkout kernel source
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.kernel_version != '' && format('{0}-{1}', inputs.suite || 'resolute-qcom', inputs.kernel_version) || inputs.suite || 'resolute-qcom' }}
           path: kernel-src
@@ -168,7 +168,7 @@ jobs:
       # 5. Checkout docker-pkg-build
       # -----------------------------------------------------------------------
       - name: Checkout docker-pkg-build
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: qualcomm-linux/docker-pkg-build
           ref: main
