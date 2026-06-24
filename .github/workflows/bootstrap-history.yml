@@ -1,0 +1,181 @@
+# SPDX-License-Identifier: BSD-3-Clause
+#
+# bootstrap-history.yml
+#
+# One-time, automated bootstrap of a suite branch with the COMPLETE Canonical
+# kernel history from Launchpad. Run this ONCE per suite (via "Run workflow");
+# thereafter fetch-source-pkg.yml keeps it current incrementally.
+#
+# This exists because the steady-state sync is incremental and therefore needs a
+# real-history base to exist first, but the branch starts with no usable history
+# (the legacy pipeline stored flattened snapshots with no upstream ancestry).
+#
+# How it works (single shot)
+# ──────────────────────────
+# scripts/seed-history.sh does a FULL `git clone` of the upstream history
+# (Launchpad's shallow/deepen path is broken, but it can serve a full clone),
+# then pushes the seed in <2 GB slices (GitHub caps a single push at 2 GB) with
+# the upstream upload tags mirrored verbatim.
+#
+#   * The seed is pushed to a <suite>-seed branch (e.g. resolute-qcom-seed),
+#     NEVER the live branch -- a human reviews and promotes it.
+#   * The cloned repo is cached (actions/cache); if the publish fails, a manual
+#     re-dispatch restores the cache and skips re-downloading the history.
+
+name: "Bootstrap: Seed Canonical Kernel History"
+
+on:
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: "Suite to seed (e.g. resolute-qcom, noble, questing, resolute). Pushed to <suite>-seed."
+        required: false
+        default: "resolute-qcom"
+        type: string
+      custom_git_url:
+        description: "Git URL to seed from. Leave empty to use the official Ubuntu kernel repo for the base suite."
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: write   # push the seeded branch and tags
+
+jobs:
+  bootstrap:
+    name: "Seed ${{ inputs.suite }}-seed"
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 350
+
+    steps:
+      # -----------------------------------------------------------------------
+      # 1. Free disk space -- a full kernel history is multi-GB.
+      # -----------------------------------------------------------------------
+      - name: Free up runner disk space
+        run: |
+          sudo rm -rf \
+            /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /opt/hostedtoolcache/CodeQL /usr/local/share/boost \
+            "$AGENT_TOOLSDIRECTORY" 2>/dev/null || true
+          sudo apt-get clean
+          df -h /
+
+      # -----------------------------------------------------------------------
+      # 2. Check out this repo just for the scripts/ helpers.
+      # -----------------------------------------------------------------------
+      - name: Checkout CI scripts
+        uses: actions/checkout@v6
+
+      # -----------------------------------------------------------------------
+      # 3. Resolve the seed configuration (URL, tag prefix, seed branch).
+      # -----------------------------------------------------------------------
+      - name: Resolve configuration
+        id: cfg
+        env:
+          SUITE:          ${{ inputs.suite || 'resolute-qcom' }}
+          CUSTOM_GIT_URL: ${{ inputs.custom_git_url }}
+        run: |
+          BASE_SUITE="$(echo "${SUITE}" | cut -d'-' -f1)"
+
+          if [ -n "${CUSTOM_GIT_URL}" ]; then
+            UPSTREAM_URL="${CUSTOM_GIT_URL}"
+            UPSTREAM_PREFIX="Ubuntu-qcom"
+          elif echo "${SUITE}" | grep -q '-'; then
+            # A custom (suffixed) suite with no URL given defaults to the
+            # Qualcomm-Ubuntu carmel-team repository for that base suite.
+            UPSTREAM_URL="https://git.launchpad.net/~carmel-team/ubuntu/+source/linux/+git/${BASE_SUITE}"
+            UPSTREAM_PREFIX="Ubuntu-qcom"
+          else
+            UPSTREAM_URL="https://git.launchpad.net/~ubuntu-kernel/ubuntu/+source/linux/+git/${BASE_SUITE}"
+            UPSTREAM_PREFIX="Ubuntu"
+          fi
+
+          {
+            echo "suite=${SUITE}"
+            echo "upstream_url=${UPSTREAM_URL}"
+            echo "upstream_prefix=${UPSTREAM_PREFIX}"
+            echo "seed_branch=${SUITE}-seed"
+            echo "cache_path=${RUNNER_TEMP}/history-seed"
+          } >> "$GITHUB_OUTPUT"
+
+          # Seed pushed to <suite>-seed (NOT the live branch); tags mirrored verbatim.
+          echo "Suite ${SUITE} -> seed branch ${SUITE}-seed from ${UPSTREAM_URL} (tags ${UPSTREAM_PREFIX}-* verbatim)"
+
+      # -----------------------------------------------------------------------
+      # 4. Restore a previously-cloned seed (so a retry after a failed publish
+      #    skips re-downloading the multi-GB history).
+      # -----------------------------------------------------------------------
+      - name: Restore cached clone
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.cfg.outputs.cache_path }}
+          key: history-seed-${{ steps.cfg.outputs.suite }}-${{ github.run_id }}
+          restore-keys: |
+            history-seed-${{ steps.cfg.outputs.suite }}-
+
+      # -----------------------------------------------------------------------
+      # 5. Full-clone the history and publish the seed. Capture the exit code so
+      #    the clone can be cached before the job is failed on a publish error.
+      # -----------------------------------------------------------------------
+      - name: Seed history
+        id: seed
+        env:
+          MIRROR_URL:      https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git
+          UPSTREAM_URL:    ${{ steps.cfg.outputs.upstream_url }}
+          BRANCH:          ${{ steps.cfg.outputs.seed_branch }}
+          UPSTREAM_PREFIX: ${{ steps.cfg.outputs.upstream_prefix }}
+          WORKDIR:         ${{ steps.cfg.outputs.cache_path }}
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name  "github-actions[bot]"
+
+          set +e
+          bash scripts/seed-history.sh
+          rc=$?
+          set -e
+
+          echo "rc=${rc}" >> "$GITHUB_OUTPUT"
+          if [ "${rc}" -eq 0 ]; then
+            echo "status=complete" >> "$GITHUB_OUTPUT"
+          else
+            echo "status=failed" >> "$GITHUB_OUTPUT"
+          fi
+
+      # -----------------------------------------------------------------------
+      # 6. On failure, cache the cloned history so a manual re-dispatch can reuse
+      #    it instead of re-downloading from the slow Launchpad server.
+      # -----------------------------------------------------------------------
+      - name: Cache clone for retry
+        if: steps.seed.outputs.status == 'failed'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ steps.cfg.outputs.cache_path }}
+          key: history-seed-${{ steps.cfg.outputs.suite }}-${{ github.run_id }}
+
+      # -----------------------------------------------------------------------
+      # 7. Surface a publish/clone failure as a red job, AFTER the clone is cached.
+      # -----------------------------------------------------------------------
+      - name: Fail on seed error
+        if: steps.seed.outputs.status == 'failed'
+        run: |
+          echo "::error::seed-history.sh failed (rc=${{ steps.seed.outputs.rc }})." \
+               "The clone is cached; investigate and re-dispatch to retry the publish."
+          exit 1
+
+      # -----------------------------------------------------------------------
+      # 8. Summary.
+      # -----------------------------------------------------------------------
+      - name: Print summary
+        if: always()
+        run: |
+          {
+            echo "## Bootstrap Summary"
+            echo ""
+            echo "| Field | Value |"
+            echo "|-------|-------|"
+            echo "| Seed branch | \`${{ steps.cfg.outputs.seed_branch }}\` |"
+            echo "| Status      | \`${{ steps.seed.outputs.status || 'failed' }}\` |"
+            if [ "${{ steps.seed.outputs.status }}" = "complete" ]; then
+              echo "| Result      | Seed pushed -- review and promote \`${{ steps.cfg.outputs.seed_branch }}\` to the live branch |"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

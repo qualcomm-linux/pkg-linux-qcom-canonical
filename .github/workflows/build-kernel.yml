@@ -10,9 +10,9 @@
 # docker-pkg-build, ensuring a clean, reproducible environment
 # that exactly matches the target distro.
 #
-# Output .deb packages are stored in two places:
-#   1. S3 bucket       – qli-prd-lecore-gh-artifacts (permanent)
-#   2. GitHub artifact – attached to the workflow run, retained 90 days
+# Output .deb packages are uploaded ONLY to the S3 bucket
+# (qli-prd-lecore-gh-artifacts), on the lecore-production runner. No GitHub
+# Actions artifacts and no GitHub Releases are produced.
 
 name: "Build: Canonical Kernel .deb Packages"
 
@@ -20,12 +20,12 @@ on:
   workflow_dispatch:
     inputs:
       suite:
-        description: "Branch to build from (e.g. resolute-qcom, noble, questing, resolute)"
+        description: "Branch to build from (e.g. resolute-qcom)"
         required: true
         default: "resolute-qcom"
         type: string
       kernel_version:
-        description: "Kernel version string (e.g. 7.0.0-1003.3) – used for release asset attachment"
+        description: "Version (e.g. 7.0.0-1006.8) - builds the exact Ubuntu-qcom-<version> tag. Empty = branch HEAD."
         required: false
         type: string
       arch:
@@ -47,29 +47,29 @@ on:
           - lowlatency
           - all
       runner:
-        description: "Runner to use for the build"
+        description: "Runner to use for the build (lecore-production is the only one that uploads to S3)"
         required: false
-        default: "ubuntu-24.04-arm"
+        default: "lecore-production"
         type: choice
         options:
+          - lecore-production
           - ubuntu-24.04-arm
           - self-hosted
-          - lecore-production
 
 permissions:
-  contents: write   # upload assets to release tag
+  contents: read    # checkout + tag ls-remote only; output goes to S3
 
 jobs:
   # --------------------------------------------------------------------------
   # Job: build
   # --------------------------------------------------------------------------
   build:
-    name: "Build ${{ inputs.suite }} ${{ inputs.flavor }} (${{ inputs.arch }})"
+    name: "Build"
     # Map friendly runner names to their actual runs-on labels.
-    # self-hosted        → "self-hosted"  (bcollaku dev machine)
-    # lecore-production  → ["self-hosted","lecore-prd-u2404-arm64-xlrg-od-ephem"]
-    # ubuntu-24.04-arm   → "ubuntu-24.04-arm" (GitHub-hosted, default)
-    runs-on: ${{ fromJSON('{"ubuntu-24.04-arm":"ubuntu-24.04-arm","self-hosted":"self-hosted","lecore-production":["self-hosted","lecore-prd-u2404-arm64-xlrg-od-ephem"]}')[inputs.runner || 'ubuntu-24.04-arm'] }}
+    # lecore-production  → ["self-hosted","lecore-prd-u2404-arm64-xlrg-od-ephem"] (default; uploads to S3)
+    # ubuntu-24.04-arm   → "ubuntu-24.04-arm" (GitHub-hosted)
+    # self-hosted        → "self-hosted"
+    runs-on: ${{ fromJSON('{"ubuntu-24.04-arm":"ubuntu-24.04-arm","self-hosted":"self-hosted","lecore-production":["self-hosted","lecore-prd-u2404-arm64-xlrg-od-ephem"]}')[inputs.runner || 'lecore-production'] }}
     timeout-minutes: 360
 
     env:
@@ -109,14 +109,21 @@ jobs:
           echo "REPO_NAME=${GITHUB_REPOSITORY#*/}"  >> "$GITHUB_ENV"
 
       # -----------------------------------------------------------------------
-      # 2b. Derive base suite for Docker container selection.
-      #     Strips any custom suffix so the correct pkg-builder image is used.
-      #     e.g. resolute-qcom → resolute, noble → noble, questing → questing
+      # 2b. Derive base suite (for Docker image) and upstream tag prefix.
+      #     BASE_SUITE strips any custom suffix so the correct pkg-builder image
+      #     is used (resolute-qcom → resolute). UPSTREAM_PREFIX is the verbatim
+      #     Canonical tag prefix the source branch was mirrored with
+      #     (custom/qcom suites → Ubuntu-qcom; official suites → Ubuntu).
       # -----------------------------------------------------------------------
-      - name: Derive base suite for Docker
+      - name: Derive base suite and tag prefix
         run: |
           BASE_SUITE=$(echo "${SUITE}" | cut -d'-' -f1)
           echo "BASE_SUITE=${BASE_SUITE}" >> "$GITHUB_ENV"
+          if echo "${SUITE}" | grep -q '-'; then
+            echo "UPSTREAM_PREFIX=Ubuntu-qcom" >> "$GITHUB_ENV"
+          else
+            echo "UPSTREAM_PREFIX=Ubuntu" >> "$GITHUB_ENV"
+          fi
           echo "Suite: ${SUITE}  →  Base suite: ${BASE_SUITE}"
 
       # -----------------------------------------------------------------------
@@ -129,7 +136,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="${SUITE}-${{ inputs.kernel_version }}"
+          TAG="${UPSTREAM_PREFIX}-${{ inputs.kernel_version }}"
           echo "Verifying tag '${TAG}' exists in repository..."
 
           if git ls-remote --exit-code --tags \
@@ -148,20 +155,20 @@ jobs:
 
       # -----------------------------------------------------------------------
       # 4. Checkout the kernel source
-      #    - If kernel_version is provided: checkout the exact tag
-      #      <suite>-<kernel_version> so the build uses the precise synced
-      #      source regardless of what else is on the branch tip.
+      #    - If kernel_version is provided: checkout the exact verbatim Canonical
+      #      tag <UPSTREAM_PREFIX>-<kernel_version> (e.g. Ubuntu-qcom-7.0.0-1006.8)
+      #      so the build uses the precise synced source.
       #    - If kernel_version is empty: checkout the suite branch HEAD
-      #      (test/dev builds — no release will be created).
+      #      (test/dev builds).
       #    Note: actions/checkout checks out a ref of THIS repository
-      #    (pkg-linux-qcom-canonical). The resolute/noble/questing branches
-      #    of this repo contain the full kernel source tree populated by
+      #    (pkg-linux-qcom-canonical). The resolute-qcom/noble/... branches of
+      #    this repo contain the full kernel source tree mirrored by
       #    fetch-source-pkg.yml — they are not the main branch.
       # -----------------------------------------------------------------------
       - name: Checkout kernel source
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.kernel_version != '' && format('{0}-{1}', inputs.suite || 'resolute-qcom', inputs.kernel_version) || inputs.suite || 'resolute-qcom' }}
+          ref: ${{ inputs.kernel_version != '' && format('{0}-{1}', env.UPSTREAM_PREFIX, inputs.kernel_version) || inputs.suite || 'resolute-qcom' }}
           path: kernel-src
 
       # -----------------------------------------------------------------------
@@ -299,92 +306,24 @@ jobs:
           destination: ${{ env.ORG_NAME }}/pkg/temp/${{ env.REPO_NAME }}/${{ github.run_id }}-${{ github.run_attempt }}/
 
       # -----------------------------------------------------------------------
-      # 10. Upload as GitHub Actions artifact (90-day fallback)
-      # -----------------------------------------------------------------------
-      - name: Upload packages as artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: "kernel-debs-${{ inputs.suite }}-${{ inputs.arch }}-${{ inputs.flavor }}"
-          path: output/
-          retention-days: 90
-          if-no-files-found: warn
-
-      # -----------------------------------------------------------------------
-      # 11. Install GitHub CLI if not present (required on self-hosted runners)
-      # -----------------------------------------------------------------------
-      - name: Install GitHub CLI (if not present)
-        if: inputs.kernel_version != ''
-        run: |
-          if ! command -v gh &>/dev/null; then
-            echo "gh not found — installing..."
-            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
-              | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
-              | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-            sudo apt-get update -qq
-            sudo apt-get install -y gh
-            echo "✓ gh installed: $(gh --version | head -1)"
-          else
-            echo "✓ gh already available: $(gh --version | head -1)"
-          fi
-
-      # -----------------------------------------------------------------------
-      # 12. Create GitHub Release and attach built packages
-      # -----------------------------------------------------------------------
-      - name: Create GitHub Release and attach packages
-        if: inputs.kernel_version != ''
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          TAG="${SUITE}-${{ inputs.kernel_version }}"
-          DEBS=$(find output/ -name "*.deb" | sort)
-
-          if [ -z "${DEBS}" ]; then
-            echo "No .deb files to attach"
-            exit 0
-          fi
-
-          # Create the release if it doesn't already exist
-          if ! gh release view "${TAG}" \
-               --repo "${{ github.repository }}" \
-               --json tagName -q .tagName \
-               >/dev/null 2>&1; then
-            echo "Creating GitHub Release ${TAG}..."
-            printf 'Ubuntu %s kernel %s built for arm64.\n\nFlavour: %s\nRunner: %s\n' \
-              "${SUITE}" "${{ inputs.kernel_version }}" \
-              "${FLAVOR}" "${{ runner.name }}" \
-              > /tmp/release-notes.md
-            gh release create "${TAG}" \
-              --repo "${{ github.repository }}" \
-              --title "Ubuntu ${SUITE} kernel ${{ inputs.kernel_version }} (arm64)" \
-              --notes-file /tmp/release-notes.md \
-              --latest=false
-          fi
-
-          echo "Uploading packages to release ${TAG}..."
-          echo "${DEBS}" | xargs gh release upload "${TAG}" \
-            --repo "${{ github.repository }}" \
-            --clobber
-          echo "Packages attached to release ${TAG}"
-          echo "Release URL: https://github.com/${{ github.repository }}/releases/tag/${TAG}"
-
-      # -----------------------------------------------------------------------
-      # 13. Summary
+      # 10. Summary
       # -----------------------------------------------------------------------
       - name: Print summary
         if: always()
         run: |
-          echo "## Kernel Build Summary" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Field | Value |" >> "$GITHUB_STEP_SUMMARY"
-          echo "|-------|-------|" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Branch       | \`${SUITE}\` |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Architecture | \`${ARCH}\` |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Flavour      | \`${FLAVOR}\` |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Container    | \`ghcr.io/qualcomm-linux/pkg-builder:${BASE_SUITE}\` |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Runner       | \`${{ runner.name }}\` |" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "### Built packages" >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-          ls -lh output/*.deb 2>/dev/null || echo "(none)"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "## Kernel Build Summary"
+            echo ""
+            echo "| Field | Value |"
+            echo "|-------|-------|"
+            echo "| Branch       | \`${SUITE}\` |"
+            echo "| Architecture | \`${ARCH}\` |"
+            echo "| Flavour      | \`${FLAVOR}\` |"
+            echo "| Container    | \`ghcr.io/qualcomm-linux/pkg-builder:${BASE_SUITE}\` |"
+            echo "| Runner       | \`${{ runner.name }}\` |"
+            echo ""
+            echo "### Built packages"
+            echo '```'
+            ls -lh output/*.deb 2>/dev/null || echo "(none)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

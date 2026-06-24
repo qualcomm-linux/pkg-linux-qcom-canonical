@@ -2,411 +2,161 @@
 #
 # fetch-source-pkg.yml
 #
-# Syncs the Canonical Ubuntu kernel from the Launchpad git repository into
-# a branch of this repo, building an incremental commit history of syncs.
+# Mirrors the latest Qualcomm-Ubuntu kernel upload from the carmel-team Launchpad
+# repository into the resolute-qcom branch (preserving full upstream history),
+# then triggers a kernel build.
 #
-# Approach: shallow clone + rsync + incremental commit
-#   git clone --depth=1 fetches exactly one commit from Launchpad — reliably
-#   served without triggering rate limits or 503 errors. Each sync adds a
-#   commit to our branch showing exactly what changed between kernel versions.
-#   git diff between any two of our tags shows the precise delta.
+# This repo mirrors exactly ONE source into ONE branch, so the workflow takes no
+# inputs -- everything is fixed:
+#   upstream : git.launchpad.net/~carmel-team/ubuntu/+source/linux/+git/resolute
+#   branch   : resolute-qcom
+#   tags     : Ubuntu-qcom-X.Y.Z-A.B  (mirrored verbatim from upstream)
 #
-# Why git instead of the source package?
-#   The Ubuntu kernel source package (format 1.0) ships only debian.master/
-#   with rules.d/ fragments — debian/rules is NOT included. The complete
-#   debian/ directory (with rules, scripts/, templates/, etc.) lives in the
-#   Launchpad git repository. Using the git source gives a buildable tree.
+# History-preserving "mirror-repoint" model
+#   * resolute-qcom is a movable "latest Canonical" pointer.
+#   * The upstream Ubuntu-qcom-X.Y.Z-A.B tag is mirrored verbatim as the immutable
+#     per-upload record.
+#   * A sync is pure fetch + repoint (scripts/sync-mirror.sh): it never merges or
+#     rebases, so it cannot conflict.
 #
-# Repository branch layout
-# ─────────────────────────
-#   main          – CI infrastructure: workflows, scripts, documentation
-#   noble         – Ubuntu Noble (24.04 LTS) kernel source, one commit/upload
-#   resolute-qcom – Ubuntu-qcom kernel source, one commit/upload (daily default)
-#   <branch>      – additional branches added on demand
-#
-# Each branch tip is tagged  <branch>-<version>
-# (e.g.  resolute-qcom-7.0.0-1003.3).
-#
-# Repository variables (Settings → Variables → Actions):
-#   KERNEL_SUITE          – default branch to sync when not specified (default: resolute-qcom)
-#   KERNEL_SOURCE         – source package name (default: linux)
-#   KERNEL_CUSTOM_GIT_URL – default custom git URL for scheduled runs
-#                           (default: https://git.launchpad.net/~carmel-team/ubuntu/+source/linux/+git/resolute)
+# Prerequisite: resolute-qcom must first be seeded with full history by the
+# "Bootstrap: Seed Canonical Kernel History" workflow. This job is incremental
+# and refuses to run against an un-seeded branch.
 
 name: "Sync: Canonical Kernel Sources to Branch"
+run-name: "Mirror latest Ubuntu-qcom upload into resolute-qcom"
 
 on:
-  workflow_dispatch:
-    inputs:
-      suite:
-        description: "Branch to sync into (e.g. resolute-qcom, noble, questing, resolute)"
-        required: false
-        default: "resolute-qcom"
-        type: string
-      force:
-        description: "Re-sync even if this version is already committed"
-        type: boolean
-        default: false
-      custom_git_url:
-        description: "Git URL to clone from. Leave empty to use the official Ubuntu kernel repo."
-        required: false
-        default: ""
-        type: string
+  workflow_dispatch:   # manual only; always mirrors the latest carmel-team upload
 
 permissions:
   contents: write
   actions: write
 
+# Only one sync at a time -- a second run's lease-pinned push would be rejected.
+concurrency:
+  group: mirror-sync-resolute-qcom
+  cancel-in-progress: false
+
+env:
+  BRANCH:          resolute-qcom
+  UPSTREAM_URL:    "https://git.launchpad.net/~carmel-team/ubuntu/+source/linux/+git/resolute"
+  UPSTREAM_PREFIX: Ubuntu-qcom
+
 jobs:
+  # ==========================================================================
+  # Job 1 - cheap "is there a new upload?" gate (no clone).
+  # ==========================================================================
   check-version:
-    name: "Check latest version on Launchpad"
+    name: "Check for new uploads"
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 10
-
     outputs:
-      version:          ${{ steps.query.outputs.version }}
-      upstream_version: ${{ steps.query.outputs.upstream_version }}
-      tag:              ${{ steps.query.outputs.tag }}
-      suite:            ${{ steps.query.outputs.suite }}
-      base_suite:       ${{ steps.query.outputs.base_suite }}
-      source:           ${{ steps.query.outputs.source }}
-      git_url:          ${{ steps.query.outputs.git_url }}
-      git_tag_prefix:   ${{ steps.query.outputs.git_tag_prefix }}
-      should_sync:      ${{ steps.gate.outputs.should_sync }}
-
+      should_sync: ${{ steps.gate.outputs.should_sync }}
     steps:
-      - name: Install dependencies
-        run: sudo apt-get install -y --no-install-recommends jq
-
-      - name: Resolve version and git URL
-        id: query
-        env:
-          SUITE:          ${{ inputs.suite || vars.KERNEL_SUITE || 'resolute-qcom' }}
-          SOURCE:         ${{ vars.KERNEL_SOURCE || 'linux' }}
-          # For scheduled runs: fall back to vars.KERNEL_CUSTOM_GIT_URL or the
-          # hardcoded carmel-team URL so the daily build always uses resolute-qcom.
-          # For manual runs: use exactly what the user entered — empty string means
-          # "use the official Ubuntu repo" (no custom URL → Launchpad REST API path).
-          CUSTOM_GIT_URL: ${{ github.event_name == 'schedule' && (vars.KERNEL_CUSTOM_GIT_URL || 'https://git.launchpad.net/~carmel-team/ubuntu/+source/linux/+git/resolute') || inputs.custom_git_url }}
-          # GIT_TAG_PREFIX is derived automatically:
-          #   custom URL → Ubuntu-qcom  (Ubuntu-qcom-7.0.0-1003.3 style tags)
-          #   official   → Ubuntu       (Ubuntu-X.Y.Z-A.B style tags, set in else branch)
-          GIT_TAG_PREFIX: "Ubuntu-qcom"
-        run: |
-          # Derive the base Ubuntu suite by stripping any custom suffix.
-          # e.g. resolute-qcom → resolute, noble → noble, questing → questing
-          # Used for Launchpad API queries and default git URL construction.
-          BASE_SUITE=$(echo "${SUITE}" | cut -d'-' -f1)
-          echo "Suite      : ${SUITE}"
-          echo "Base suite : ${BASE_SUITE}"
-
-          if [ -n "${CUSTOM_GIT_URL}" ]; then
-            # ----------------------------------------------------------------
-            # Custom repo path: find the latest <GIT_TAG_PREFIX>-* tag via
-            # git ls-remote. This bypasses the Launchpad REST API entirely —
-            # the version is derived directly from the tags present in the
-            # custom repository.
-            #
-            # The Ubuntu-qcom Launchpad repository uses tags of the form:
-            #   Ubuntu-qcom-7.0.0-1003.3
-            # so GIT_TAG_PREFIX defaults to "Ubuntu-qcom".
-            # ----------------------------------------------------------------
-            echo "Custom git URL    : ${CUSTOM_GIT_URL}"
-            echo "Git tag prefix    : ${GIT_TAG_PREFIX}"
-            echo "Querying tags from custom repo..."
-
-            LATEST_TAG=$(git ls-remote --tags "${CUSTOM_GIT_URL}" "refs/tags/${GIT_TAG_PREFIX}-*" \
-              | grep -v '\^{}' \
-              | awk '{print $2}' \
-              | sed 's|refs/tags/||' \
-              | sort -V \
-              | tail -1)
-
-            [ -n "${LATEST_TAG}" ] || {
-              echo "ERROR: No ${GIT_TAG_PREFIX}-* tags found in ${CUSTOM_GIT_URL}" >&2
-              exit 1
-            }
-
-            # Ubuntu-qcom-7.0.0-1003.3 → 7.0.0-1003.3
-            VERSION="${LATEST_TAG#${GIT_TAG_PREFIX}-}"
-            GIT_URL="${CUSTOM_GIT_URL}"
-
-            echo "Latest tag : ${LATEST_TAG}"
-          else
-            # ----------------------------------------------------------------
-            # Default path: query the Launchpad REST API for the latest
-            # officially published source package version, then construct
-            # the standard Launchpad git URL for the suite.
-            # Official Ubuntu repos use Ubuntu-X.Y.Z-A.B tag format.
-            # ----------------------------------------------------------------
-            GIT_TAG_PREFIX="Ubuntu"
-
-            API="https://api.launchpad.net/1.0/ubuntu/+archive/primary"
-            API+="?ws.op=getPublishedSources"
-            API+="&source_name=${SOURCE}"
-            API+="&distro_series=/ubuntu/${BASE_SUITE}"
-            API+="&status=Published"
-            API+="&order_by_date=true"
-            API+="&ws.size=300"
-
-            echo "Querying: ${API}"
-            RESP=$(curl -fsSL "${API}")
-
-            VERSION=$(echo "$RESP" | jq -r \
-              --arg name "${SOURCE}" \
-              '[.entries[] | select(.source_package_name == $name)] | .[0].source_package_version // empty')
-            [ -n "${VERSION}" ] || {
-              echo "ERROR: No exact match for '${SOURCE}' in ${SUITE}" >&2
-              exit 1
-            }
-
-            GIT_URL="https://git.launchpad.net/~ubuntu-kernel/ubuntu/+source/linux/+git/${BASE_SUITE}"
-          fi
-
-          UPSTREAM=$(echo "${VERSION}" | cut -d'-' -f1)
-          TAG="${SUITE}-${VERSION}"
-
-          echo "version=${VERSION}"               >> "$GITHUB_OUTPUT"
-          echo "upstream_version=${UPSTREAM}"     >> "$GITHUB_OUTPUT"
-          echo "tag=${TAG}"                       >> "$GITHUB_OUTPUT"
-          echo "suite=${SUITE}"                   >> "$GITHUB_OUTPUT"
-          echo "base_suite=${BASE_SUITE}"         >> "$GITHUB_OUTPUT"
-          echo "source=${SOURCE}"                 >> "$GITHUB_OUTPUT"
-          echo "git_url=${GIT_URL}"               >> "$GITHUB_OUTPUT"
-          echo "git_tag_prefix=${GIT_TAG_PREFIX}" >> "$GITHUB_OUTPUT"
-
-          echo "Version    : ${VERSION}"
-          echo "Tag        : ${TAG}"
-          echo "Git URL    : ${GIT_URL}"
-          echo "Tag prefix : ${GIT_TAG_PREFIX}"
-
-      - name: Check whether tag already exists
+      - name: Gate on un-mirrored uploads
         id: gate
         env:
-          TAG: ${{ steps.query.outputs.tag }}
+          MIRROR_URL: https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git
         run: |
-          if [ "${{ inputs.force }}" = "true" ]; then
-            echo "should_sync=true" >> "$GITHUB_OUTPUT"
-            echo "Force flag set – will re-sync"
-            exit 0
-          fi
+          # Compare upstream upload tags against our mirrored tags via two cheap
+          # ls-remote calls (no clone). should_sync is true iff any upstream
+          # upload has no matching tag here. Capture ls-remote first so a transport
+          # failure is not mistaken for "upstream has no tags".
+          up_raw="$(git ls-remote --tags "${UPSTREAM_URL}" "refs/tags/${UPSTREAM_PREFIX}-*")" \
+            || { echo "::error::git ls-remote failed for upstream (network/auth?)"; exit 1; }
+          mapfile -t UP < <(
+            printf '%s\n' "${up_raw}" \
+              | grep -v '\^{}' | sed -E "s#.*refs/tags/${UPSTREAM_PREFIX}-##" | sort -V
+          )
+          [ "${#UP[@]}" -gt 0 ] || { echo "No ${UPSTREAM_PREFIX}-* tags upstream"; exit 1; }
+          LATEST="${UP[-1]}"
 
-          if git ls-remote --exit-code --tags \
-               "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" \
-               "refs/tags/${TAG}" >/dev/null 2>&1; then
-            echo "should_sync=false" >> "$GITHUB_OUTPUT"
-            echo "Tag '${TAG}' already exists – nothing to do"
-          else
-            echo "should_sync=true" >> "$GITHUB_OUTPUT"
-            echo "Tag '${TAG}' not found – will sync"
-          fi
+          OURS="$(
+            git ls-remote --tags "${MIRROR_URL}" "refs/tags/${UPSTREAM_PREFIX}-*" \
+              | grep -v '\^{}' | sed -E "s#.*refs/tags/${UPSTREAM_PREFIX}-##" || true
+          )"
 
+          # -F: match the version as a fixed string (dots are not wildcards).
+          SHOULD_SYNC=false
+          for ver in "${UP[@]}"; do
+            if ! grep -qxF "${ver}" <<<"${OURS}"; then SHOULD_SYNC=true; break; fi
+          done
+
+          echo "should_sync=${SHOULD_SYNC}" >> "$GITHUB_OUTPUT"
+          echo "Latest upstream: ${LATEST}; new uploads to mirror: ${SHOULD_SYNC}"
+
+  # ==========================================================================
+  # Job 2 - mirror every new upload (history-preserving), via sync-mirror.sh.
+  # ==========================================================================
   sync:
-    name: "Sync ${{ needs.check-version.outputs.suite }} sources to branch"
+    name: "Mirror"
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 120
+    timeout-minutes: 60
     needs: check-version
     if: needs.check-version.outputs.should_sync == 'true'
 
-    env:
-      VERSION:          ${{ needs.check-version.outputs.version }}
-      UPSTREAM_VERSION: ${{ needs.check-version.outputs.upstream_version }}
-      TAG:              ${{ needs.check-version.outputs.tag }}
-      SUITE:            ${{ needs.check-version.outputs.suite }}
-      SOURCE:           ${{ needs.check-version.outputs.source }}
-      GIT_URL:          ${{ needs.check-version.outputs.git_url }}
-      GIT_TAG_PREFIX:   ${{ needs.check-version.outputs.git_tag_prefix }}
+    outputs:
+      synced_version: ${{ steps.sync.outputs.synced_version }}
+      synced_count:   ${{ steps.sync.outputs.synced_count }}
 
     steps:
-      # -----------------------------------------------------------------------
-      # 1. Free up disk space
-      # -----------------------------------------------------------------------
       - name: Free up runner disk space
         run: |
-          echo "Disk before cleanup:"
-          df -h /
           sudo rm -rf \
-            /usr/share/dotnet \
-            /usr/local/lib/android \
-            /opt/ghc \
-            /opt/hostedtoolcache/CodeQL \
-            /usr/local/share/boost \
-            "$AGENT_TOOLSDIRECTORY" \
-            2>/dev/null || true
+            /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /opt/hostedtoolcache/CodeQL /usr/local/share/boost \
+            "$AGENT_TOOLSDIRECTORY" 2>/dev/null || true
           sudo apt-get clean
-          echo "Disk after cleanup:"
-          df -h /
 
-      # -----------------------------------------------------------------------
-      # 2. Install tools
-      # -----------------------------------------------------------------------
-      - name: Install dependencies
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends \
-            curl jq rsync
+      - name: Checkout CI scripts
+        uses: actions/checkout@v6
 
-      # -----------------------------------------------------------------------
-      # 3. Clone from the resolved git URL at the version tag.
-      #    GIT_URL is either the custom repo URL (when custom_git_url input
-      #    was provided) or the standard Launchpad URL for the suite.
-      #    GIT_TAG_PREFIX determines the tag format:
-      #      Ubuntu-qcom → Ubuntu-qcom-7.0.0-1003.3  (resolute-qcom repo)
-      #      Ubuntu      → Ubuntu-6.8.0-114.114       (official repos)
-      # -----------------------------------------------------------------------
-      - name: Clone from git repo at version tag
-        run: |
-          GIT_TAG="${GIT_TAG_PREFIX}-${VERSION}"
-
-          echo "Cloning ${GIT_URL} at tag ${GIT_TAG} (shallow)..."
-          git clone --depth=1 --branch "${GIT_TAG}" "${GIT_URL}" kernel-src/
-
-          echo "SRC_DIR=kernel-src" >> "$GITHUB_ENV"
-
-          FILE_COUNT=$(find kernel-src/ -type f | wc -l)
-          echo "Cloned ${FILE_COUNT} files"
-          [ "${FILE_COUNT}" -gt 5000 ] || {
-            echo "ERROR: Too few files cloned (${FILE_COUNT})"
-            exit 1
-          }
-
-          echo "Top-level contents:"
-          ls kernel-src/
-
-          echo "debian/ contents:"
-          ls kernel-src/debian/ | head -20
-
-      # -----------------------------------------------------------------------
-      # 4. Configure git
-      # -----------------------------------------------------------------------
-      - name: Configure git identity
+      # BRANCH, UPSTREAM_URL and UPSTREAM_PREFIX come from the workflow-level env
+      # above; sync-mirror.sh reads them directly.
+      - name: Mirror new uploads
+        id: sync
+        env:
+          MIRROR_URL: https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git
+          WORKDIR:    ${{ runner.temp }}/mirror-sync
         run: |
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name  "github-actions[bot]"
+          bash scripts/sync-mirror.sh
 
-      # -----------------------------------------------------------------------
-      # 5. Prepare the suite branch
-      # -----------------------------------------------------------------------
-      - name: Clone repository for suite branch update
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          REPO_URL="https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
-          git clone "${REPO_URL}" suite-repo
-
-      - name: Check out or create suite branch
-        run: |
-          cd suite-repo
-
-          if git ls-remote --exit-code origin "refs/heads/${SUITE}" >/dev/null 2>&1; then
-            echo "Branch '${SUITE}' exists – checking out"
-            git checkout "${SUITE}"
-            git rm -rf --quiet . 2>/dev/null || true
-          else
-            echo "Branch '${SUITE}' does not exist – creating orphan branch"
-            git checkout --orphan "${SUITE}"
-            git rm -rf --quiet . 2>/dev/null || true
-          fi
-
-      - name: Populate suite branch with cloned source
-        run: |
-          echo "Copying source tree from ${SRC_DIR} → suite-repo/"
-          rsync -a --delete \
-            --exclude='.git' \
-            "${SRC_DIR}/" suite-repo/
-
-          COPIED=$(find suite-repo/ -type f | wc -l)
-          echo "Files in suite-repo after rsync: ${COPIED}"
-          [ "${COPIED}" -gt 5000 ] || {
-            echo "ERROR: rsync copied only ${COPIED} files"
-            exit 1
-          }
-
-          cd suite-repo
-
-          SYNC_DATE=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
-          printf '%s\n\n%s\n%s\n%s\n%s\n%s\n' \
-            "${SUITE}: ${VERSION}" \
-            "Branch         : ${SUITE}" \
-            "Kernel version : ${VERSION}" \
-            "Upstream       : ${UPSTREAM_VERSION}" \
-            "Source         : ${GIT_URL} (tag: ${GIT_TAG_PREFIX}-${VERSION})" \
-            "Synced         : ${SYNC_DATE}" \
-            > /tmp/commit-msg.txt
-
-          git add --all
-
-          if git diff --cached --quiet; then
-            echo "No changes to commit – branch already has this content"
-          else
-            git commit -F /tmp/commit-msg.txt
-            echo "Committed ${SUITE} branch at $(git rev-parse HEAD)"
-          fi
-
-      - name: Tag the commit
-        run: |
-          cd suite-repo
-          git tag -fa "${TAG}" -m "${SUITE} kernel ${VERSION}"
-          echo "Tagged: ${TAG}"
-
-      - name: Push suite branch and tag
-        run: |
-          cd suite-repo
-          git push origin "${SUITE}"
-          git push --force origin "${TAG}"
-          echo "Pushed branch '${SUITE}' and tag '${TAG}'"
-
-      # -----------------------------------------------------------------------
-      # 6. Summary
-      # -----------------------------------------------------------------------
       - name: Print summary
         if: always()
         run: |
-          GIT_TAG="${GIT_TAG_PREFIX}-${VERSION}"
+          {
+            echo "## Sync Summary"
+            echo ""
+            echo "| Field | Value |"
+            echo "|-------|-------|"
+            echo "| Branch           | \`${BRANCH}\` |"
+            echo "| Uploads mirrored | ${{ steps.sync.outputs.synced_count || 0 }} |"
+            echo "| Latest version   | \`${{ steps.sync.outputs.synced_version }}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
 
-          echo "## Source Sync Summary" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Field | Value |" >> "$GITHUB_STEP_SUMMARY"
-          echo "|-------|-------|" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Branch      | \`${SUITE}\` |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Version     | \`${VERSION}\` |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Branch ref  | [\`${SUITE}\`](https://github.com/${{ github.repository }}/tree/${SUITE}) |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Tag         | [\`${TAG}\`](https://github.com/${{ github.repository }}/releases/tag/${TAG}) |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Cloned from | \`${GIT_URL}\` |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Git tag     | \`${GIT_TAG}\` |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Launchpad   | https://launchpad.net/ubuntu/${SUITE}/+source/${SOURCE}/${VERSION} |" >> "$GITHUB_STEP_SUMMARY"
-
+  # ==========================================================================
+  # Job 3 - trigger a kernel build for the newest mirrored upload.
+  # ==========================================================================
   trigger-build:
     name: "Trigger kernel build"
     runs-on: ubuntu-24.04-arm
     needs: [check-version, sync]
-    if: needs.sync.result == 'success'
+    if: needs.sync.result == 'success' && needs.sync.outputs.synced_count != '0'
 
     steps:
       - name: Dispatch build-kernel workflow
         env:
           GH_TOKEN: ${{ github.token }}
-          SUITE:    ${{ needs.check-version.outputs.suite }}
-          VERSION:  ${{ needs.check-version.outputs.version }}
+          VERSION:  ${{ needs.sync.outputs.synced_version }}
         run: |
-          # Derive the kernel flavour from the branch name.
-          # Custom branches (any branch with a suffix, e.g. resolute-qcom)
-          # use the 'qcom' flavour. Official Ubuntu suite branches
-          # (noble, questing, resolute — no suffix) use 'generic'.
-          # This ensures the daily resolute-qcom build always uses qcom.
-          if echo "${SUITE}" | grep -q '-'; then
-            FLAVOR="qcom"
-          else
-            FLAVOR="generic"
-          fi
-          echo "Branch: ${SUITE}  →  Flavour: ${FLAVOR}"
-
+          echo "Building ${BRANCH} ${VERSION} (flavour qcom)"
           gh workflow run build-kernel.yml \
             --repo "${{ github.repository }}" \
-            --field suite="${SUITE}" \
+            --field suite="${BRANCH}" \
             --field kernel_version="${VERSION}" \
             --field arch="arm64" \
-            --field flavor="${FLAVOR}" \
+            --field flavor="qcom" \
             --field runner="lecore-production"
-
-          echo "Build workflow dispatched for ${SUITE} ${VERSION} (flavor=${FLAVOR}, runner=lecore-production)"
