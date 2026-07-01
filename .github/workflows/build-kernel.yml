@@ -20,9 +20,9 @@ on:
   workflow_dispatch:
     inputs:
       suite:
-        description: "Branch to build from (e.g. resolute-qcom)"
+        description: "Branch to build from (e.g. resolute-qcom-devel, resolute-qcom)"
         required: true
-        default: "resolute-qcom"
+        default: "resolute-qcom-devel"
         type: string
       kernel_version:
         description: "Version (e.g. 7.0.0-1006.8) - builds the exact Ubuntu-qcom-<version> tag. Empty = branch HEAD."
