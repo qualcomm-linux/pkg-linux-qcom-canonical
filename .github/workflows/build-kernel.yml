@@ -55,6 +55,49 @@ on:
           - lecore-production
           - ubuntu-24.04-arm
           - self-hosted
+      devel_prs:
+        description: "Space-separated PR numbers against resolute-qcom-devel to merge before building (e.g. 42 43)"
+        required: false
+        default: ""
+        type: string
+
+  workflow_call:
+    inputs:
+      suite:
+        description: "Branch to build from"
+        required: false
+        default: "resolute-qcom-devel"
+        type: string
+      kernel_version:
+        description: "Version tag to build. Empty = branch HEAD."
+        required: false
+        default: ""
+        type: string
+      arch:
+        description: "Target Debian architecture"
+        required: false
+        default: "arm64"
+        type: string
+      flavor:
+        description: "Kernel flavour to build"
+        required: false
+        default: "qcom"
+        type: string
+      runner:
+        description: "Runner to use"
+        required: false
+        default: "ubuntu-24.04-arm"
+        type: string
+      devel_prs:
+        description: "Space-separated PR numbers against resolute-qcom-devel to merge before building"
+        required: false
+        default: ""
+        type: string
+      ref:
+        description: "Git ref to checkout for the kernel source. Overrides suite-derived ref when set (used by premerge-pr.yml to pin the PR head SHA)."
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read    # checkout + tag ls-remote only; output goes to S3
@@ -66,9 +109,9 @@ jobs:
   build:
     name: "Build"
     # Map friendly runner names to their actual runs-on labels.
-    # lecore-production  → ["self-hosted","lecore-prd-u2404-arm64-xlrg-od-ephem"] (default; uploads to S3)
-    # ubuntu-24.04-arm   → "ubuntu-24.04-arm" (GitHub-hosted)
-    # self-hosted        → "self-hosted"
+    # lecore-production  -> ["self-hosted","lecore-prd-u2404-arm64-xlrg-od-ephem"] (default; uploads to S3)
+    # ubuntu-24.04-arm   -> "ubuntu-24.04-arm" (GitHub-hosted)
+    # self-hosted        -> "self-hosted"
     runs-on: ${{ fromJSON('{"ubuntu-24.04-arm":"ubuntu-24.04-arm","self-hosted":"self-hosted","lecore-production":["self-hosted","lecore-prd-u2404-arm64-xlrg-od-ephem"]}')[inputs.runner || 'lecore-production'] }}
     timeout-minutes: 360
 
@@ -111,9 +154,9 @@ jobs:
       # -----------------------------------------------------------------------
       # 2b. Derive base suite (for Docker image) and upstream tag prefix.
       #     BASE_SUITE strips any custom suffix so the correct pkg-builder image
-      #     is used (resolute-qcom → resolute). UPSTREAM_PREFIX is the verbatim
+      #     is used (resolute-qcom -> resolute). UPSTREAM_PREFIX is the
       #     Canonical tag prefix the source branch was mirrored with
-      #     (custom/qcom suites → Ubuntu-qcom; official suites → Ubuntu).
+      #     (custom/qcom suites -> Ubuntu-qcom; official suites -> Ubuntu).
       # -----------------------------------------------------------------------
       - name: Derive base suite and tag prefix
         run: |
@@ -124,7 +167,7 @@ jobs:
           else
             echo "UPSTREAM_PREFIX=Ubuntu" >> "$GITHUB_ENV"
           fi
-          echo "Suite: ${SUITE}  →  Base suite: ${BASE_SUITE}"
+          echo "Suite: ${SUITE}  ->  Base suite: ${BASE_SUITE}"
 
       # -----------------------------------------------------------------------
       # 3. Validate kernel_version against existing tags (fail fast)
@@ -142,7 +185,7 @@ jobs:
           if git ls-remote --exit-code --tags \
                "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" \
                "refs/tags/${TAG}" >/dev/null 2>&1; then
-            echo "✓ Tag '${TAG}' exists — proceeding with build"
+            echo "Tag '${TAG}' exists -- proceeding with build"
           else
             echo "ERROR: Tag '${TAG}' does not exist in this repository." >&2
             echo "" >&2
@@ -155,21 +198,64 @@ jobs:
 
       # -----------------------------------------------------------------------
       # 4. Checkout the kernel source
-      #    - If kernel_version is provided: checkout the exact verbatim Canonical
-      #      tag <UPSTREAM_PREFIX>-<kernel_version> (e.g. Ubuntu-qcom-7.0.0-1006.8)
+      #    - If kernel_version is provided: checkout the exact Canonical tag
+      #      <UPSTREAM_PREFIX>-<kernel_version> (e.g. Ubuntu-qcom-7.0.0-1006.8)
       #      so the build uses the precise synced source.
       #    - If kernel_version is empty: checkout the suite branch HEAD
       #      (test/dev builds).
       #    Note: actions/checkout checks out a ref of THIS repository
       #    (pkg-linux-qcom-canonical). The resolute-qcom/noble/... branches of
       #    this repo contain the full kernel source tree mirrored by
-      #    fetch-source-pkg.yml — they are not the main branch.
+      #    fetch-source-pkg.yml -- they are not the main branch.
       # -----------------------------------------------------------------------
       - name: Checkout kernel source
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.kernel_version != '' && format('{0}-{1}', env.UPSTREAM_PREFIX, inputs.kernel_version) || inputs.suite || 'resolute-qcom' }}
+          ref: ${{ inputs.ref != '' && inputs.ref || (inputs.kernel_version != '' && format('{0}-{1}', env.UPSTREAM_PREFIX, inputs.kernel_version) || inputs.suite || 'resolute-qcom') }}
           path: kernel-src
+
+      # -----------------------------------------------------------------------
+      # 4b. Merge additional PRs against resolute-qcom-devel into the
+      #     checked-out source tree (engineering builds only).
+      #     Each PR number is validated as numeric before use. Conflicts abort
+      #     the build immediately with a clear error.
+      # -----------------------------------------------------------------------
+      - name: Merge devel PRs into source tree
+        if: inputs.devel_prs != ''
+        env:
+          DEVEL_PRS: ${{ inputs.devel_prs }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd kernel-src/
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name  "github-actions[bot]"
+
+          REPO_URL="https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          git remote set-url origin "${REPO_URL}"
+
+          echo "PRs to merge: ${DEVEL_PRS}"
+          for pr in ${DEVEL_PRS}; do
+            [[ "${pr}" =~ ^[0-9]+$ ]] || {
+              echo "ERROR: invalid PR number '${pr}' -- must be numeric" >&2
+              exit 1
+            }
+            echo "::group::Merging resolute-qcom-devel PR #${pr}"
+            git fetch --no-tags origin "refs/pull/${pr}/head:pr-${pr}"
+
+            if ! git merge --no-ff --no-commit "pr-${pr}"; then
+              echo "ERROR: merge conflict while merging PR #${pr}. Aborting." >&2
+              git merge --abort || true
+              exit 1
+            fi
+
+            if git diff --cached --quiet; then
+              echo "PR #${pr} already present in tree -- nothing to merge."
+            else
+              git commit -m "Merged resolute-qcom-devel PR #${pr}"
+              echo "PR #${pr} merged successfully."
+            fi
+            echo "::endgroup::"
+          done
 
       # -----------------------------------------------------------------------
       # 5. Checkout docker-pkg-build
@@ -202,10 +288,6 @@ jobs:
 
           echo "Building: suite=${SUITE}  base_suite=${BASE_SUITE}  target=${TARGET}  arch=${ARCH}  jobs=${JOBS}"
 
-          # IMPORTANT: use single quotes for bash -c so the outer shell does NOT
-          # expand $(...) or ${VAR} before passing the string to docker.
-          # JOBS, TARGET, and WS are passed as -e env vars and expanded inside
-          # the container by the container's own bash.
           docker run -i --privileged --rm \
             -v "${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE}" \
             --workdir="${GITHUB_WORKSPACE}" \
@@ -216,8 +298,6 @@ jobs:
             bash -c '
               set -euo pipefail
 
-              # Enable deb-src so apt-get build-dep can resolve build dependencies.
-              # pkg-builder:noble is Ubuntu 24.04 which uses DEB822 format.
               sed -i "s/^Types: deb$/Types: deb deb-src/" /etc/apt/sources.list.d/ubuntu.sources
               apt-get update -qq
               apt-get build-dep -y linux
@@ -226,43 +306,19 @@ jobs:
               echo "debian/debian.env: $(cat debian/debian.env 2>/dev/null || echo NOT FOUND)"
               ls -la debian/rules && echo "debian/rules: OK" || { echo "debian/rules: NOT FOUND"; exit 1; }
 
-              # Heartbeat every 2 min — kernel build takes 60-90 min with minimal output
               while true; do echo "[$(date -u +%H:%M:%S)] kernel build still running..."; sleep 120; done &
               HEARTBEAT=$!
 
-              # Run the clean target to set up the full build environment before
-              # compilation. This is the standard Ubuntu kernel build setup path:
-              #   - runs debian/control as a dependency, generating
-              #     debian/canonical-certs.pem (required by certs/x509_certificate_list)
-              #     and debian/control
-              #   - creates debian/changelog → debian.master/changelog symlink
-              #     (required by dh_installchangelogs at the end of binary-generic)
-              #   - removes any stale build artifacts
-              #
-              # Use "fakeroot make -f debian/rules" rather than "fakeroot debian/rules":
-              # fakeroot is a shell script that execs the command via /bin/sh (dash);
-              # dash resolves the shebang (#!/usr/bin/make -f) and reports "not found"
-              # if make is not yet on PATH at exec time. Invoking make explicitly
-              # bypasses the shebang lookup entirely.
               echo "=== Setting up build environment (debian/rules clean) ==="
               fakeroot make -f debian/rules clean
 
-              # Safety net: ensure debian/changelog symlink exists.
-              # The clean target should create it as part of standard setup,
-              # but if it does not (container environment difference), the
-              # build would fail at dh_installchangelogs after 2+ hours.
-              # This guard is a no-op when clean already created the symlink.
               if [ ! -f debian/changelog ] && [ -f debian.master/changelog ]; then
                 ln -sf ../debian.master/changelog debian/changelog
-                echo "Safety net: created debian/changelog → debian.master/changelog"
+                echo "Safety net: created debian/changelog -> debian.master/changelog"
               fi
 
               echo "=== Starting: fakeroot debian/rules ${TARGET} (jobs=${JOBS}) ==="
               export DEB_BUILD_OPTIONS="parallel=${JOBS} nocheck"
-              # do_skip_checks=true skips the config policy check that requires
-              # CONFIG_RUST_IS_AVAILABLE=y — bindgen-0.65 is not available in
-              # the container so Rust support is unavailable, causing the check
-              # to fail. This is the standard approach for non-official builds.
               fakeroot debian/rules "${TARGET}" do_skip_checks=true
 
               kill "${HEARTBEAT}" 2>/dev/null || true
@@ -277,8 +333,6 @@ jobs:
 
       # -----------------------------------------------------------------------
       # 8. Collect output packages
-      #    The Ubuntu kernel build drops .deb files one level above the
-      #    source tree (i.e. in GITHUB_WORKSPACE, not inside kernel-src/).
       # -----------------------------------------------------------------------
       - name: Collect built packages
         run: |
@@ -293,9 +347,6 @@ jobs:
 
       # -----------------------------------------------------------------------
       # 9. Upload to S3 (lecore-production runner only)
-      #    Skipped on GitHub-hosted and generic self-hosted runners.
-      #    Condition checks the runner input, not runner.name, because the
-      #    runner's registered display name may differ from its label.
       # -----------------------------------------------------------------------
       - name: Upload kernel .deb packages to S3
         if: inputs.runner == 'lecore-production'
@@ -321,6 +372,9 @@ jobs:
             echo "| Flavour      | \`${FLAVOR}\` |"
             echo "| Container    | \`ghcr.io/qualcomm-linux/pkg-builder:${BASE_SUITE}\` |"
             echo "| Runner       | \`${{ runner.name }}\` |"
+            if [ -n "${{ inputs.devel_prs }}" ]; then
+              echo "| Devel PRs    | \`${{ inputs.devel_prs }}\` |"
+            fi
             echo ""
             echo "### Built packages"
             echo '```'
