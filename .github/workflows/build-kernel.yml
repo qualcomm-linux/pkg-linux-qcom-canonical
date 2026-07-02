@@ -86,7 +86,7 @@ on:
       runner:
         description: "Runner to use"
         required: false
-        default: "ubuntu-24.04-arm"
+        default: "lecore-production"
         type: string
       devel_prs:
         description: "Space-separated PR numbers against resolute-qcom-devel to merge before building"
