@@ -72,3 +72,4 @@ Others:
  - UBUNTU: SAUCE: Reapply "serial: 8250: Switch to nbcon console"
  - UBUNTU: SAUCE: Reapply "serial: 8250: Revert "drop lockdep annotation from serial8250_clear_IER()"
 premerge test 1
+retrigger
