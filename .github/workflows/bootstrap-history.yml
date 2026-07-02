@@ -106,7 +106,7 @@ jobs:
       #    skips re-downloading the multi-GB history).
       # -----------------------------------------------------------------------
       - name: Restore cached clone
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: ${{ steps.cfg.outputs.cache_path }}
           key: history-seed-${{ steps.cfg.outputs.suite }}-${{ github.run_id }}
@@ -147,7 +147,7 @@ jobs:
       # -----------------------------------------------------------------------
       - name: Cache clone for retry
         if: steps.seed.outputs.status == 'failed'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: ${{ steps.cfg.outputs.cache_path }}
           key: history-seed-${{ steps.cfg.outputs.suite }}-${{ github.run_id }}
