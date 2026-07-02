@@ -6,13 +6,18 @@
 # Runs a full kernel build (no S3 upload) and reports pass/fail as a
 # status check on the PR.
 #
+# Uses pull_request_target so the workflow is resolved from the default
+# branch (main / feat/pr-build-pipeline) rather than from the base branch
+# of the PR (resolute-qcom-devel, which is a kernel source tree with no
+# .github/ directory).
+#
 # The build checks out the exact PR head SHA so concurrent PRs are
 # fully isolated. A new push to the same PR cancels the in-flight run.
 
 name: "Pre-merge PR build"
 
 on:
-  pull_request:
+  pull_request_target:
     branches:
       - resolute-qcom-devel
     types:
