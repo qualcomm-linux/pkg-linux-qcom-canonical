@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: BSD-3-Clause
+#
+# premerge-pr.yml
+#
+# Triggered on every PR opened or updated against resolute-qcom-devel.
+# Runs a full kernel build and reports pass/fail as a status check on the PR.
+#
+# Uses pull_request_target so the workflow is resolved from the default
+# branch (main) rather than from the base branch of the PR
+# (resolute-qcom-devel, which is a kernel source tree with no .github/).
+#
+# The build checks out the exact PR head SHA so concurrent PRs are
+# fully isolated. A new push to the same PR cancels the in-flight run.
+
+name: "Pre-merge PR build"
+
+on:
+  pull_request_target:
+    branches:
+      - resolute-qcom-devel
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+concurrency:
+  group: premerge-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  build:
+    name: "Build check"
+    uses: ./.github/workflows/build-kernel.yml
+    with:
+      suite: resolute-qcom-devel
+      ref: ${{ github.event.pull_request.head.sha }}

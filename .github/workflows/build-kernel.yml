@@ -55,6 +55,34 @@ on:
           - lecore-production
           - ubuntu-24.04-arm
           - self-hosted
+      devel_prs:
+        description: "Space-separated PR numbers against resolute-qcom-devel to merge before building (e.g. 42 43)"
+        required: false
+        default: ""
+        type: string
+
+  workflow_call:
+    inputs:
+      suite:
+        description: "Branch to build from"
+        required: false
+        default: "resolute-qcom-devel"
+        type: string
+      kernel_version:
+        description: "Version tag to build. Empty = branch HEAD."
+        required: false
+        default: ""
+        type: string
+      devel_prs:
+        description: "Space-separated PR numbers against resolute-qcom-devel to merge before building"
+        required: false
+        default: ""
+        type: string
+      ref:
+        description: "Exact git ref to checkout. Overrides suite/kernel_version when set (used by premerge-pr.yml to pin the PR head SHA)."
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read    # checkout + tag ls-remote only; output goes to S3
@@ -168,8 +196,47 @@ jobs:
       - name: Checkout kernel source
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.kernel_version != '' && format('{0}-{1}', env.UPSTREAM_PREFIX, inputs.kernel_version) || inputs.suite || 'resolute-qcom' }}
+          ref: ${{ inputs.ref != '' && inputs.ref || (inputs.kernel_version != '' && format('{0}-{1}', env.UPSTREAM_PREFIX, inputs.kernel_version) || inputs.suite || 'resolute-qcom') }}
           path: kernel-src
+
+      # -----------------------------------------------------------------------
+      # 4b. Merge additional PRs against resolute-qcom-devel into the
+      #     checked-out source tree (engineering builds only).
+      #     Each PR number is validated as numeric before use. Conflicts abort
+      #     the build immediately with a clear error.
+      # -----------------------------------------------------------------------
+      - name: Merge devel PRs into source tree
+        if: inputs.devel_prs != ''
+        env:
+          DEVEL_PRS: ${{ inputs.devel_prs }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd kernel-src/
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name  "github-actions[bot]"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+
+          echo "PRs to merge: ${DEVEL_PRS}"
+          for pr in ${DEVEL_PRS}; do
+            [[ "${pr}" =~ ^[0-9]+$ ]] || {
+              echo "ERROR: invalid PR number '${pr}' -- must be numeric" >&2
+              exit 1
+            }
+            echo "::group::Merging resolute-qcom-devel PR #${pr}"
+            git fetch --no-tags origin "refs/pull/${pr}/head:pr-${pr}"
+            if ! git merge --no-ff --no-commit "pr-${pr}"; then
+              echo "ERROR: merge conflict while merging PR #${pr}. Aborting." >&2
+              git merge --abort || true
+              exit 1
+            fi
+            if git diff --cached --quiet; then
+              echo "PR #${pr} already present in tree -- nothing to merge."
+            else
+              git commit -m "Merged resolute-qcom-devel PR #${pr}"
+              echo "PR #${pr} merged successfully."
+            fi
+            echo "::endgroup::"
+          done
 
       # -----------------------------------------------------------------------
       # 5. Checkout docker-pkg-build
@@ -298,7 +365,6 @@ jobs:
       #    runner's registered display name may differ from its label.
       # -----------------------------------------------------------------------
       - name: Upload kernel .deb packages to S3
-        if: inputs.runner == 'lecore-production'
         uses: qualcomm-linux/upload-private-artifact-action@aws-v4
         with:
           s3_bucket: qli-prd-lecore-gh-artifacts
@@ -321,6 +387,9 @@ jobs:
             echo "| Flavour      | \`${FLAVOR}\` |"
             echo "| Container    | \`ghcr.io/qualcomm-linux/pkg-builder:${BASE_SUITE}\` |"
             echo "| Runner       | \`${{ runner.name }}\` |"
+            if [ -n "${{ inputs.devel_prs }}" ]; then
+              echo "| Devel PRs    | \`${{ inputs.devel_prs }}\` |"
+            fi
             echo ""
             echo "### Built packages"
             echo '```'
