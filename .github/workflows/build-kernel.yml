@@ -71,15 +71,12 @@ jobs:
   # --------------------------------------------------------------------------
   build:
     name: "Build"
-    # Map friendly runner names to their actual runs-on labels.
-    # lecore-production  → ["self-hosted","lecore-prd-u2404-arm64-xlrg-od-ephem"] (default; uploads to S3)
-    # ubuntu-24.04-arm   → "ubuntu-24.04-arm" (GitHub-hosted)
-    # self-hosted        → "self-hosted"
+    # Runner is always lecore-production for this repo.
     runs-on: ["self-hosted", "lecore-prd-u2404-arm64-xlrg-od-ephem"]
     timeout-minutes: 360
 
     env:
-      SUITE:   ${{ inputs.suite   || 'resolute-qcom' }}
+      SUITE:   ${{ inputs.suite   || 'resolute-qcom-devel' }}
       ARCH:    arm64
       FLAVOR:  qcom
 
