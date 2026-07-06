@@ -1,3 +1,4 @@
+# test patch 2
 Driver-related patches (dropped at every major release if they are not yet upstream):
 
 Ubuntu-specific features not supported anymore:
