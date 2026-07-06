@@ -198,7 +198,7 @@ jobs:
       - name: Build kernel packages (ghcr.io/qualcomm-linux/pkg-builder:${{ inputs.suite || 'resolute-qcom' }})
         run: |
           JOBS=$(nproc)
-          if [ "${FLAVOR}" = "all" ]; then TARGET="binary"; else TARGET="binary-${FLAVOR}"; fi
+          if [ "${FLAVOR}" = "all" ]; then TARGET="binary"; else TARGET="binary-${FLAVOR} binary-indep"; fi
 
           echo "Building: suite=${SUITE}  base_suite=${BASE_SUITE}  target=${TARGET}  arch=${ARCH}  jobs=${JOBS}"
 
@@ -263,7 +263,7 @@ jobs:
               # CONFIG_RUST_IS_AVAILABLE=y — bindgen-0.65 is not available in
               # the container so Rust support is unavailable, causing the check
               # to fail. This is the standard approach for non-official builds.
-              fakeroot debian/rules "${TARGET}" do_skip_checks=true
+              fakeroot debian/rules ${TARGET} do_skip_checks=true
 
               kill "${HEARTBEAT}" 2>/dev/null || true
 
