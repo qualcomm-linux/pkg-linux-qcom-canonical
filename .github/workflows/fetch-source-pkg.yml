@@ -156,7 +156,4 @@ jobs:
           gh workflow run build-kernel.yml \
             --repo "${{ github.repository }}" \
             --field suite="${BRANCH}" \
-            --field kernel_version="${VERSION}" \
-            --field arch="arm64" \
-            --field flavor="qcom" \
-            --field runner="lecore-production"
+            --field kernel_version="${VERSION}" 
