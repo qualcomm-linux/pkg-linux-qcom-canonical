@@ -15,7 +15,8 @@ pkg-linux-qcom-canonical
 │   ├── .github/workflows/
 │   │   ├── fetch-source-pkg.yml      ← manual incremental mirror sync
 │   │   ├── bootstrap-history.yml     ← one-time full-history seed
-│   │   └── build-kernel.yml          ← build .deb packages
+│   │   ├── build-kernel.yml          ← build .deb packages
+│   │   └── premerge-pr.yml           ← PR build check for resolute-qcom-devel
 │   ├── scripts/
 │   │   ├── sync-mirror.sh            ← incremental mirror-repoint (CI)
 │   │   └── seed-history.sh           ← one-time full-history bootstrap (CI)
@@ -190,7 +191,7 @@ triggers a build of the newest one.
 
 Trigger manually: **Actions → Build: Canonical Kernel .deb Packages → Run
 workflow**. It builds the `resolute-qcom-devel` integration branch by default; set
-`suite` to `resolute-qcom` to build the mirror instead. The `kernel_version` input
+the **Branch to build from** field to `resolute-qcom` to build from the mirror branch instead. The `kernel_version` input
 controls what is checked out:
 
 | `kernel_version` | Source checked out | Use |
@@ -216,7 +217,7 @@ Mirrors new upstream uploads into `resolute-qcom`, history-preserving, via
 |-----|-------------|
 | `check-version` | Two `ls-remote` calls (no clone): newest upstream `Ubuntu-qcom-*` tag vs our tags. Sets `should_sync`. |
 | `sync` | Bare-clones our mirror; for each un-mirrored upload (ascending): fetches the upstream tag (delta only), advances `resolute-qcom`, and atomically pushes the branch + the verbatim tag (lease-pinned, fail-fast). Never merges/rebases. |
-| `trigger-build` | Dispatches `build-kernel.yml` for the newest synced upload of the mirror (`suite=resolute-qcom`, `arch=arm64`, `flavor=qcom`, `runner=lecore-production`). |
+| `trigger-build` | Dispatches `build-kernel.yml` for the newest synced upload of the mirror (`suite=resolute-qcom`, `kernel_version=<synced version>`). |
 
 Idempotent: if the newest upload is already mirrored, the run exits without cloning
 anything.
@@ -230,27 +231,38 @@ packages inside the base-suite-matched
 - **Trigger**: dispatched by the sync, or manually.
 - **Output**: **S3 only** (`lecore-production` runner). No artifacts, no releases.
 
-| Input | Default | Description |
-|-------|---------|-------------|
-| `suite` | `resolute-qcom-devel` | Branch to build from; base suite (`resolute`) derived for container selection. |
-| `kernel_version` | *(empty)* | Builds the exact `Ubuntu-qcom-<version>` tag (validated first). Empty = branch HEAD. |
-| `arch` | `arm64` | Target architecture. |
-| `flavor` | `qcom` | Kernel flavour. **`qcom` is the only flavour this tree builds** (`generic`/`lowlatency` do not exist for the qcom derivative). `all` builds `qcom` + `qcom-rt`. |
-| `runner` | `ubuntu-24.04-arm` | `ubuntu-24.04-arm` (hosted, no S3), `self-hosted`, or `lecore-production` (the only runner that uploads to S3). |
+| Input | Default | Trigger | Description |
+|-------|---------|---------|-------------|
+| `suite` | `resolute-qcom-devel` | dispatch + call | Branch to build from; base suite (`resolute`) derived for container selection. |
+| `kernel_version` | *(empty)* | dispatch + call | Builds the exact `Ubuntu-qcom-<version>` tag (validated first). Empty = branch HEAD. |
+| `devel_prs` | *(empty)* | dispatch + call | Space-separated PR numbers against `resolute-qcom-devel` to merge before building (e.g. `42 43`). Conflict aborts with a clear error. |
+| `ref` | *(empty)* | call only | Exact git ref to checkout, overrides `suite`/`kernel_version` when set. Used by `premerge-pr.yml` to pin the PR head SHA. |
+| `skip_s3` | `false` | call only | Skip the S3 upload step. Used by `premerge-pr.yml` so premerge builds are build-only and never upload. |
 
 **Build steps**:
 1. Free disk space.
-2. Checkout the tag/branch → `kernel-src/`.
-3. Checkout `qualcomm-linux/docker-pkg-build@main`.
-4. Derive `BASE_SUITE` (`resolute-qcom` → `resolute`).
-5. Build the image: `docker_deb_build.py --rebuild -d <base_suite>`.
-6. In-container: `apt-get build-dep linux`; `fakeroot make -f debian/rules clean`;
+2. Checkout the tag/branch (or `ref` if set) → `kernel-src/`.
+3. If `devel_prs` is set: merge each PR against `resolute-qcom-devel` into `kernel-src/` (conflict aborts).
+4. Checkout `qualcomm-linux/docker-pkg-build@main`.
+5. Derive `BASE_SUITE` (`resolute-qcom` → `resolute`).
+6. Build the image: `docker_deb_build.py --rebuild -d <base_suite>`.
+7. In-container: `apt-get build-dep linux`; `fakeroot make -f debian/rules clean`;
    `fakeroot debian/rules binary-<flavor> do_skip_checks=true`
    (see [Build container notes](#build-container-notes)).
-7. Collect `.deb` files and upload to S3.
+8. Collect `.deb` files and upload to S3 (skipped when `skip_s3=true`).
 
 **Self-hosted runner requirements** (`lecore-production`): Ubuntu 24.04 arm64,
 Docker (runner user in the `docker` group), ≥ 25 GB free disk.
+
+### `premerge-pr.yml` - PR build check
+
+Runs a build-only kernel build as a status check on every PR against `resolute-qcom-devel`.
+
+- **Trigger**: `pull_request_target` on `resolute-qcom-devel` (opened, synchronize, reopened).
+- **Why `pull_request_target` and not `pull_request`**: `resolute-qcom-devel` is a kernel source tree with no `.github/` directory. `pull_request` resolves the workflow from the base branch of the PR -- since `resolute-qcom-devel` has no workflows, it would never fire. `pull_request_target` resolves workflows from the default branch (`main`) where they live, so the trigger works correctly.
+- **Runner**: `lecore-production` (hardcoded, same as all builds).
+- **Concurrency**: one build per PR number; a new push cancels the in-progress build for that PR.
+- **What it does**: calls `build-kernel.yml` via `workflow_call` with `suite=resolute-qcom-devel`, `ref=<PR head SHA>` (pins the exact commit under test), and `skip_s3=true` (build-only, no S3 upload).
 
 ## The CI scripts
 
