@@ -56,6 +56,11 @@ on:
         required: false
         default: ""
         type: string
+      skip_s3:
+        description: "Skip uploading built .deb packages to S3 (used by premerge-pr.yml for build-only checks)."
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read    # checkout + tag ls-remote only; output goes to S3
@@ -333,11 +338,10 @@ jobs:
 
       # -----------------------------------------------------------------------
       # 9. Upload to S3 (lecore-production runner only)
-      #    Skipped on GitHub-hosted and generic self-hosted runners.
-      #    Condition checks the runner input, not runner.name, because the
-      #    runner's registered display name may differ from its label.
+      #    Skipped when skip_s3 is set (premerge-pr.yml build-only checks).
       # -----------------------------------------------------------------------
       - name: Upload kernel .deb packages to S3
+        if: inputs.skip_s3 != true
         uses: qualcomm-linux/upload-private-artifact-action@aws-v4
         with:
           s3_bucket: qli-prd-lecore-gh-artifacts

@@ -38,3 +38,4 @@ jobs:
     with:
       suite: resolute-qcom-devel
       ref: ${{ github.event.pull_request.head.sha }}
+      skip_s3: true
