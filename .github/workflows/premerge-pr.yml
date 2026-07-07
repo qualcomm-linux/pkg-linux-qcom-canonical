@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: BSD-3-Clause
+#
+# premerge-pr.yml - pre-merge validation build for resolute-qcom-devel.
+# Lives on resolute-qcom-devel (GitHub resolves pull_request workflows from the PR
+# base branch). Thin caller of the reusable build-kernel.yml on main. Rationale
+# and security note: docs/PIPELINE.md#pre-merge-validation.
+#
+# Security: uses pull_request (NOT pull_request_target), so the run gets a
+# read-only token and no secrets, and it builds the PR MERGE REF - never a raw
+# attacker head under an elevated token. Contributor PRs come from forks, so the
+# build runs untrusted PR code on the credentialed self-hosted runner: the repo
+# MUST enable "Require approval for all fork pull requests" (Settings > Actions)
+# so a maintainer gates every run.
+
+name: "Pre-merge PR build"
+
+on:
+  pull_request:
+    branches:
+      - resolute-qcom-devel
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: premerge-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: "Build check"
+    uses: qualcomm-linux/pkg-linux-qcom-canonical/.github/workflows/build-kernel.yml@main
+    with:
+      suite: resolute-qcom-devel
+      ref: refs/pull/${{ github.event.pull_request.number }}/merge
+      skip_s3: true
