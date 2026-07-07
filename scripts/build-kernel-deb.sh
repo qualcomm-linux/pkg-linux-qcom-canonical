@@ -9,8 +9,8 @@
 #
 # Arguments:
 #   SOURCE_DIR      Root of the kernel source tree containing debian/ (default: resolute-qcom-devel)
-#   ARCH            Target Debian architecture: arm64 | amd64 (default: arm64)
-#   FLAVOR          Kernel flavour: generic | lowlatency | qcom | all (default: qcom)
+#   ARCH            Target Debian architecture: arm64 (default: arm64)
+#   FLAVOR          Kernel flavour: qcom | qcom-rt | all (default: qcom)
 #   JOBS            Parallel make jobs (default: nproc)
 #   VERSION_SUFFIX  Optional string appended to the package/kernel version,
 #                    e.g. "+g1a2b3c4" or "+myuser1" (default: none). Pass

@@ -47,6 +47,7 @@ Then open a PR from `my-feature` **into `resolute-qcom-devel`**. See
 
 | Doc | For |
 |-----|-----|
+| **[scripts/README.md](scripts/README.md)** | Users - building kernel .deb packages locally |
 | **[docs/INTEGRATION.md](docs/INTEGRATION.md)** | Qualcomm developers - working on `resolute-qcom-devel` |
 | **[docs/PIPELINE.md](docs/PIPELINE.md)** | Maintainers - sync, build, and mirror operations |
 | **[CONTRIBUTING.md](CONTRIBUTING.md)** | Contributing to the CI orchestrator on `main` |
