@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: BSD-3-Clause
+#
+# daily-build.yml
+#
+# Fires build-kernel.yml once a day so resolute-qcom-devel gets a fresh .deb
+# build uploaded to S3. It only DISPATCHES the existing build workflow with an
+# explicit suite; it does not build anything itself.
+#
+# Why a dispatcher and not a `schedule:` trigger on build-kernel.yml directly:
+# a scheduled event carries no inputs, so build-kernel.yml's input defaults apply
+# inconsistently under `schedule` (notably its S3 upload is gated on the `runner`
+# input, which is empty on a scheduled run, so nothing would upload). Dispatching
+# passes the inputs explicitly, so a scheduled build behaves exactly like a manual
+# "Run workflow".
+
+name: "Daily: kernel build"
+
+on:
+  schedule:
+    # 15:00 PST = 23:00 UTC (GitHub cron is UTC).
+    - cron: "0 23 * * *"
+  workflow_dispatch: {}   # allow running the daily build on demand
+
+permissions:
+  actions: write          # required to dispatch build-kernel.yml
+
+concurrency:
+  group: daily-kernel-build
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    name: "Dispatch build-kernel"
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Trigger build-kernel for resolute-qcom-devel
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Dispatching build-kernel.yml (suite=resolute-qcom-devel)"
+          gh workflow run build-kernel.yml \
+            --repo "${{ github.repository }}" \
+            --field suite=resolute-qcom-devel
