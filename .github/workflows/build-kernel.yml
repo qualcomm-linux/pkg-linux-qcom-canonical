@@ -52,7 +52,7 @@ on:
         default: ""
         type: string
       ref:
-        description: "Exact git ref to checkout. Overrides suite/kernel_version when set (used by premerge-pr.yml to pin the PR head SHA)."
+        description: "Exact git ref to checkout. Overrides suite/kernel_version when set (used by premerge-pr.yml to build the PR merge ref)."
         required: false
         default: ""
         type: string
@@ -171,7 +171,7 @@ jobs:
       - name: Checkout kernel source
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.ref != '' && inputs.ref || (inputs.kernel_version != '' && format('{0}-{1}', env.UPSTREAM_PREFIX, inputs.kernel_version) || inputs.suite || 'resolute-qcom') }}
+          ref: ${{ inputs.ref != '' && inputs.ref || (inputs.kernel_version != '' && format('{0}-{1}', env.UPSTREAM_PREFIX, inputs.kernel_version) || inputs.suite || 'resolute-qcom-devel') }}
           path: kernel-src
 
       # -----------------------------------------------------------------------
@@ -197,17 +197,53 @@ jobs:
               echo "ERROR: invalid PR number '${pr}' -- must be numeric" >&2
               exit 1
             }
-            echo "::group::Merging resolute-qcom-devel PR #${pr}"
-            git fetch --no-tags origin "refs/pull/${pr}/head:pr-${pr}"
-            if ! git merge --no-ff --no-commit "pr-${pr}"; then
+
+            # Validate: the PR must exist, be open, and target the suite branch.
+            # A closed or wrong-base PR number would otherwise be merged silently.
+            info="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${pr}" \
+                      --jq '[.state, .base.ref] | @tsv')" || {
+              echo "ERROR: PR #${pr} not found in ${GITHUB_REPOSITORY}." >&2
+              exit 1
+            }
+            state="$(printf '%s' "${info}" | cut -f1)"
+            base="$(printf '%s'  "${info}" | cut -f2)"
+            [ "${state}" = "open" ] || {
+              echo "ERROR: PR #${pr} is '${state}' -- only open PRs can be merged." >&2
+              exit 1
+            }
+            [ "${base}" = "${SUITE}" ] || {
+              echo "ERROR: PR #${pr} targets '${base}', not '${SUITE}'." >&2
+              exit 1
+            }
+
+            echo "::group::Merging ${SUITE} PR #${pr}"
+            # The build checkout is shallow (depth 1), so the merge base with the
+            # PR is not present. Fetch the PR head and deepen BOTH histories until
+            # a merge base exists - PRs fork from a recent tip, so this stays a
+            # small fetch and never pulls the full ~1.43M-commit history.
+            git fetch --no-tags --depth=1 origin "refs/pull/${pr}/head:refs/pr/${pr}"
+            step=100; total=0; max=6400
+            until git merge-base HEAD "refs/pr/${pr}" >/dev/null 2>&1; do
+              if [ "${total}" -ge "${max}" ]; then
+                echo "ERROR: no common ancestor with PR #${pr} within ${max} commits." >&2
+                echo "Rebase the PR onto ${SUITE} and retry." >&2
+                exit 1
+              fi
+              echo "  deepening history by ${step} commits to find the merge base..."
+              git fetch --deepen="${step}" origin "refs/heads/${SUITE}" "refs/pull/${pr}/head"
+              total=$((total + step)); step=$((step * 2))
+            done
+
+            if ! git merge --no-ff --no-commit "refs/pr/${pr}"; then
               echo "ERROR: merge conflict while merging PR #${pr}. Aborting." >&2
               git merge --abort || true
               exit 1
             fi
             if git diff --cached --quiet; then
               echo "PR #${pr} already present in tree -- nothing to merge."
+              git merge --abort >/dev/null 2>&1 || true
             else
-              git commit -m "Merged resolute-qcom-devel PR #${pr}"
+              git commit -m "Merged ${SUITE} PR #${pr}"
               echo "PR #${pr} merged successfully."
             fi
             echo "::endgroup::"
@@ -350,6 +386,8 @@ jobs:
       # -----------------------------------------------------------------------
       - name: Print summary
         if: always()
+        env:
+          DEVEL_PRS: ${{ inputs.devel_prs }}
         run: |
           {
             echo "## Kernel Build Summary"
@@ -361,8 +399,8 @@ jobs:
             echo "| Flavour      | \`${FLAVOR}\` |"
             echo "| Container    | \`ghcr.io/qualcomm-linux/pkg-builder:${BASE_SUITE}\` |"
             echo "| Runner       | \`${{ runner.name }}\` |"
-            if [ -n "${{ inputs.devel_prs }}" ]; then
-              echo "| Devel PRs    | \`${{ inputs.devel_prs }}\` |"
+            if [ -n "${DEVEL_PRS}" ]; then
+              echo "| Devel PRs    | \`${DEVEL_PRS}\` |"
             fi
             echo ""
             echo "### Built packages"

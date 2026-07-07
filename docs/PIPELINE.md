@@ -15,8 +15,7 @@ pkg-linux-qcom-canonical
 │   ├── .github/workflows/
 │   │   ├── fetch-source-pkg.yml      ← manual incremental mirror sync
 │   │   ├── bootstrap-history.yml     ← one-time full-history seed
-│   │   ├── build-kernel.yml          ← build .deb packages
-│   │   └── premerge-pr.yml           ← PR build check for resolute-qcom-devel
+│   │   └── build-kernel.yml          ← build .deb packages (+ reusable workflow_call)
 │   ├── scripts/
 │   │   ├── sync-mirror.sh            ← incremental mirror-repoint (CI)
 │   │   └── seed-history.sh           ← one-time full-history bootstrap (CI)
@@ -26,6 +25,7 @@ pkg-linux-qcom-canonical
 │   └── ~1.4M commits; immutable tag per upload: Ubuntu-qcom-X.Y.Z-A.B (verbatim)
 │
 ├── resolute-qcom-devel branch        ← developer integration branch (see INTEGRATION.md)
+│   └── .github/workflows/premerge-pr.yml  ← pre-merge PR build check (lives here, not on main)
 │
 └── resolute-qcom-seed branch         ← transient bootstrap staging (only during a seed)
 ```
@@ -236,7 +236,7 @@ packages inside the base-suite-matched
 | `suite` | `resolute-qcom-devel` | dispatch + call | Branch to build from; base suite (`resolute`) derived for container selection. |
 | `kernel_version` | *(empty)* | dispatch + call | Builds the exact `Ubuntu-qcom-<version>` tag (validated first). Empty = branch HEAD. |
 | `devel_prs` | *(empty)* | dispatch + call | Space-separated PR numbers against `resolute-qcom-devel` to merge before building (e.g. `42 43`). Conflict aborts with a clear error. |
-| `ref` | *(empty)* | call only | Exact git ref to checkout, overrides `suite`/`kernel_version` when set. Used by `premerge-pr.yml` to pin the PR head SHA. |
+| `ref` | *(empty)* | call only | Exact git ref to checkout, overrides `suite`/`kernel_version` when set. Used by `premerge-pr.yml` to build the PR merge ref. |
 | `skip_s3` | `false` | call only | Skip the S3 upload step. Used by `premerge-pr.yml` so premerge builds are build-only and never upload. |
 
 **Build steps**:
@@ -254,15 +254,81 @@ packages inside the base-suite-matched
 **Self-hosted runner requirements** (`lecore-production`): Ubuntu 24.04 arm64,
 Docker (runner user in the `docker` group), ≥ 25 GB free disk.
 
-### `premerge-pr.yml` - PR build check
+### Pre-merge validation
 
-Runs a build-only kernel build as a status check on every PR against `resolute-qcom-devel`.
+The `premerge-pr.yml` check gives every PR into `resolute-qcom-devel` a build-only
+kernel build as a status check. It builds the PR's **merge ref** (the PR as it would look merged into the
+current branch HEAD) and uploads nothing (`skip_s3=true`).
 
-- **Trigger**: `pull_request_target` on `resolute-qcom-devel` (opened, synchronize, reopened).
-- **Why `pull_request_target` and not `pull_request`**: `resolute-qcom-devel` is a kernel source tree with no `.github/` directory. `pull_request` resolves the workflow from the base branch of the PR -- since `resolute-qcom-devel` has no workflows, it would never fire. `pull_request_target` resolves workflows from the default branch (`main`) where they live, so the trigger works correctly.
-- **Runner**: `lecore-production` (hardcoded, same as all builds).
-- **Concurrency**: one build per PR number; a new push cancels the in-progress build for that PR.
-- **What it does**: calls `build-kernel.yml` via `workflow_call` with `suite=resolute-qcom-devel`, `ref=<PR head SHA>` (pins the exact commit under test), and `skip_s3=true` (build-only, no S3 upload).
+- **Trigger**: `pull_request` on `resolute-qcom-devel` (opened, synchronize,
+  reopened), run via `build-kernel.yml`'s `workflow_call` interface.
+- **Where it lives**: GitHub resolves `pull_request` workflows from the PR's
+  **base branch** - here `resolute-qcom-devel`, which is a kernel tree carrying
+  none of `main`'s workflows. (Base equals the default branch only in the common
+  case; here they differ, so a workflow on `main` alone would never fire.) So the
+  workflow lives **on the integration branch itself**, at
+  `resolute-qcom-devel:.github/workflows/premerge-pr.yml` - a thin caller that
+  invokes `build-kernel.yml@main`, so no build logic lives on the kernel branch.
+  It is added and maintained by its own PR into `resolute-qcom-devel` (it is
+  **not** carried on `main`); the reference copy is below.
+- **Security**: it uses `pull_request`, **not** `pull_request_target`, so the run
+  has a read-only token and no secrets, and it builds the merge ref rather than a
+  raw attacker-controlled head. Contributor PRs come from **forks**, so the build
+  runs untrusted PR code (`debian/rules`) on the S3-credentialed
+  `lecore-production` runner. The repo **must** enable **"Require approval for all
+  fork pull requests"** (Settings > Actions > Fork pull request workflows) so a
+  maintainer reviews and approves each run before it executes - without it, this
+  is a pwn-request. Stronger still, and recommended before going public: run
+  pre-merge builds on a non-credentialed runner, or scope S3 to short-lived OIDC
+  so validation builds carry no write capability at all.
+- **Concurrency**: one build per PR; a new push cancels the in-progress build.
+
+Before the check is added: `main` must already carry the `workflow_call` interface
+(added here), and the repo must have **"Require approval for all fork pull
+requests"** enabled (see Security above) so fork PRs cannot run code on the runner
+unreviewed. To make the check blocking, add **`Build check / Build`** as a required
+status check on the `resolute-qcom-devel` ruleset.
+
+<details>
+<summary>Reference: <code>resolute-qcom-devel:.github/workflows/premerge-pr.yml</code></summary>
+
+Copy this onto `resolute-qcom-devel` (via a PR into that branch) to add or restore
+the check.
+
+```yaml
+# SPDX-License-Identifier: BSD-3-Clause
+#
+# premerge-pr.yml - pre-merge validation build for resolute-qcom-devel.
+# Lives on resolute-qcom-devel (GitHub resolves pull_request workflows from the PR
+# base branch). Thin caller of the reusable build-kernel.yml on main. Contributor
+# PRs come from forks, so the repo must enable "Require approval for all fork pull
+# requests". Rationale + security note: docs/PIPELINE.md#pre-merge-validation.
+
+name: "Pre-merge PR build"
+
+on:
+  pull_request:
+    branches:
+      - resolute-qcom-devel
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: premerge-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: "Build check"
+    uses: qualcomm-linux/pkg-linux-qcom-canonical/.github/workflows/build-kernel.yml@main
+    with:
+      suite: resolute-qcom-devel
+      ref: refs/pull/${{ github.event.pull_request.number }}/merge
+      skip_s3: true
+```
+</details>
 
 ## The CI scripts
 
