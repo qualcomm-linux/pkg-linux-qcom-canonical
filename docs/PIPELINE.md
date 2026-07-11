@@ -3,8 +3,8 @@
 How the mirror and build pipeline work, and the reasoning behind the parts that
 are easy to break.
 
-The pipeline has two halves: a **one-time bootstrap** that seeds the full history,
-and the **incremental sync + build** that runs per upload thereafter.
+The pipeline has two halves: a **one-time bootstrap** that seeds the history, and
+the **incremental sync + build** that runs per upload thereafter.
 
 ## Repository branch layout
 
@@ -14,15 +14,15 @@ pkg-linux-qcom-canonical
 ├── main branch                       ← CI orchestrator: workflows, scripts, docs
 │   ├── .github/workflows/
 │   │   ├── fetch-source-pkg.yml      ← manual incremental mirror sync
-│   │   ├── bootstrap-history.yml     ← one-time full-history seed
+│   │   ├── bootstrap-history.yml     ← one-time history seed
 │   │   └── build-kernel.yml          ← build .deb packages (+ reusable workflow_call)
 │   ├── scripts/
 │   │   ├── sync-mirror.sh            ← incremental mirror-repoint (CI)
-│   │   └── seed-history.sh           ← one-time full-history bootstrap (CI)
+│   │   └── seed-history.sh           ← one-time history bootstrap (CI)
 │   └── README.md
 │
-├── resolute-qcom branch              ← full-history mirror of the carmel-team tree (SYNC-ONLY)
-│   └── ~1.4M commits; immutable tag per upload: Ubuntu-qcom-X.Y.Z-A.B (verbatim)
+├── resolute-qcom branch              ← upstream Ubuntu kernel mirror (SYNC-ONLY)
+│   └── immutable tag per upload: Ubuntu-qcom-X.Y.Z-A.B
 │
 ├── resolute-qcom-devel branch        ← developer integration branch (see INTEGRATION.md)
 │   └── .github/workflows/premerge-pr.yml  ← pre-merge PR build check (lives here, not on main)
@@ -30,8 +30,8 @@ pkg-linux-qcom-canonical
 └── resolute-qcom-seed branch         ← transient bootstrap staging (only during a seed)
 ```
 
-`resolute-qcom` shares **no history with `main`** (the CI orchestrator); it
-carries the **complete upstream commit history** of the kernel it mirrors.
+`resolute-qcom` shares **no history with `main`** (the CI orchestrator); it holds
+the upstream kernel tree the packages are built from.
 
 ## Architecture and flow
 
@@ -39,15 +39,15 @@ carries the **complete upstream commit history** of the kernel it mirrors.
 
 ```mermaid
 flowchart LR
-    LP[("Launchpad<br/>~carmel-team / resolute<br/>Ubuntu-qcom-* tags")]
+    LP[("Launchpad<br/>upstream / resolute<br/>Ubuntu-qcom-* tags")]
     A1["bootstrap-history.yml<br/>manual, once"]
-    A2["seed-history.sh<br/>full clone ~1.43M commits<br/>relaxed slow-transfer abort"]
-    A3["sliced push &lt; 2 GB<br/>verbatim Ubuntu-qcom-* tags"]
+    A2["seed-history.sh<br/>full clone<br/>relaxed slow-transfer abort"]
+    A3["sliced push &lt; 2 GB<br/>Ubuntu-qcom-* tags"]
     A4["resolute-qcom-seed<br/>(staging branch)"]
     A5{{"human review<br/>and promote"}}
     A6[("resolute-qcom<br/>the live mirror")]
     A1 --> A2
-    LP -->|"clone full history (slow)"| A2
+    LP -->|"clone history (slow)"| A2
     A2 --> A3 --> A4 --> A5 -->|"promote"| A6
 ```
 
@@ -63,13 +63,13 @@ flowchart TB
     G{"check-version gate<br/>upstream tags vs ours<br/>anything new?"}
     NO(["no-op, exit green"])
     S1["sync-mirror.sh<br/>fetch delta tag (no --depth)"]
-    S2["repoint resolute-qcom<br/>create verbatim tag"]
+    S2["repoint resolute-qcom<br/>create tag"]
     S3["atomic lease-pinned push<br/>branch + tag"]
     RQ[("resolute-qcom<br/>advanced to new upload")]
     T["trigger-build"]
     B1["build-kernel.yml<br/>checkout Ubuntu-qcom-&lt;ver&gt; tag"]
     B2["build .deb<br/>pkg-builder:resolute"]
-    S3DB[("S3 only<br/>qli-prd-lecore-gh-artifacts")]
+    S3DB[("S3 only<br/>(private bucket)")]
     LP --> G
     G -->|"no"| NO
     G -->|"yes"| S1 --> S2 --> S3 --> RQ --> T --> B1 --> B2 --> S3DB
@@ -77,60 +77,48 @@ flowchart TB
 
 The gate is a cheap two-call `ls-remote` (no clone). Because the branch already
 holds full history, the per-upload fetch transfers only the delta, the push is
-small, and the branch fast-forwards onto the new verbatim tag.
+small, and the branch fast-forwards onto the new tag.
 
-Sync jobs run on `ubuntu-24.04-arm` (GitHub-hosted). The build runs on the
-`lecore-production` self-hosted runner (`lecore-prd-u2404-arm64-xlrg-od-ephem`).
+Sync jobs run on `ubuntu-24.04-arm` (GitHub-hosted). The build runs on a
+self-hosted arm64 runner.
 
 ## The mirror-repoint model and its guardrails
 
-`resolute-qcom` is a **faithful mirror of the upstream Canonical kernel tree with
-full commit history preserved**. Every upload is fetched with its real ancestry
-and frozen under an immutable per-upload tag.
+`resolute-qcom` mirrors the upstream Ubuntu kernel tree. Every upload is fetched
+with its history and frozen under an immutable per-upload tag.
 
 | Ref | Role |
 |-----|------|
-| **branch** `resolute-qcom` | A movable "latest Canonical" pointer. Disposable by design - force-advanced to each new upload. |
-| **tag** `Ubuntu-qcom-X.Y.Z-A.B` | The upstream Canonical tag, mirrored **verbatim**. An **immutable** per-upload record; the sole anchor that preserves that upload's history (`git diff` between any two tags is a clean kernel delta). |
+| **branch** `resolute-qcom` | A movable "latest upstream" pointer. Disposable by design - force-advanced to each new upload. |
+| **tag** `Ubuntu-qcom-X.Y.Z-A.B` | The upstream tag, kept as an **immutable** per-upload record; the sole anchor that preserves that upload's history (`git diff` between any two tags is a clean kernel delta). |
 
 A sync is **pure fetch + repoint** ([`scripts/sync-mirror.sh`](../scripts/sync-mirror.sh)):
 it only fast-forwards/repoints the mirror (no merge, no rebase), so it can never
 conflict.
 
-**Guardrails - do not "optimize" these away.** They are what keeps the ~1.43M-commit
-history intact; several look redundant until the day they save the branch:
+**Guardrails - do not "optimize" these away:**
 
-- **Never `--depth` / never shallow.** The incremental fetch and the seed must
-  produce a complete, non-shallow closure. A shallow base breaks fetch negotiation,
-  and GitHub rejects a shallow push outright.
-- **Pinned lease, atomic push.** The branch + verbatim tag are pushed together with
-  `--atomic` and `--force-with-lease=<ref>:<old-sha>` (never a bare
-  `--force-with-lease`, never a blind `--force`). This prevents a tag-lands /
-  branch-rejected split-brain and a concurrent run clobbering the branch.
-- **Tag before moving the branch, ascending.** Every missing upload is tagged in
-  version order before the branch advances past it, so a rebased middle upload is
-  never silently dropped.
-- **Never move a preservation tag.** A re-pointed upstream tag returns a non-zero
-  "would clobber existing tag"; the sync surfaces it and refuses, rather than
-  overwriting a frozen record.
-- **Bare clone, fail-fast.** The mirror is operated as a bare repo (clean ref
-  updates); any rejected push aborts the whole run so the next idempotent run can
-  never mask a partial sync.
-- **A freshly created branch is refused.** `sync-mirror.sh` aborts if the branch
-  has fewer than `MIN_HISTORY_COMMITS` (1000) - i.e. it has not been seeded with
-  real history yet. Run the bootstrap first.
+- **Never shallow.** Fetches and the seed must be a complete, non-shallow closure;
+  a shallow base breaks fetch negotiation and GitHub rejects a shallow push.
+- **Atomic, lease-pinned push.** The branch and its tag are pushed together with
+  `--atomic` and `--force-with-lease=<ref>:<old-sha>`, so a concurrent run cannot
+  clobber the branch or leave a tag/branch split-brain.
+- **Tag before advancing, never move a tag.** Each upload is tagged in version
+  order before the branch moves past it, and re-pointing an existing tag is
+  refused, so no upload is silently dropped or overwritten.
+- **Refuse an un-seeded branch.** The sync aborts if the branch has fewer than
+  `MIN_HISTORY_COMMITS` commits; run the bootstrap first.
 
-### Launchpad and GitHub limits (hard-won)
+### Launchpad and GitHub limits
 
-- Launchpad's shallow `git fetch --deepen` path is **broken** (it stalls and throws
-  `error processing shallow info`). It *can* serve a full clone, but spends several
-  minutes computing the pack server-side, so the seed relaxes the git slow-transfer
-  abort to ride out that quiet phase.
+- Launchpad cannot serve a shallow `git fetch --deepen` (it stalls); it serves only
+  a full clone and computes the pack slowly, so the seed relaxes git's slow-transfer
+  abort to ride out that phase.
 - GitHub caps a single push at **2 GB**, so the seed is pushed in `< 2 GB` slices.
 
 ## Upstream source and version discovery
 
-The mirror tracks the carmel-team Qualcomm-Ubuntu kernel on Launchpad:
+The mirror tracks the upstream Qualcomm Ubuntu kernel on Launchpad:
 [https://git.launchpad.net/~carmel-team/ubuntu/+source/linux/+git/resolute](https://git.launchpad.net/~carmel-team/ubuntu/+source/linux/+git/resolute).
 
 Version discovery is **purely git-tag based - there is no Launchpad REST API call**.
@@ -147,8 +135,8 @@ git ls-remote --tags \
 
 ## Bootstrapping
 
-`resolute-qcom` must be **seeded with full history once** before the sync can run
-incrementally. This is automated:
+`resolute-qcom` must be **seeded once** before the sync can run incrementally. This
+is automated:
 
 ```bash
 gh workflow run bootstrap-history.yml \
@@ -156,17 +144,12 @@ gh workflow run bootstrap-history.yml \
   # defaults: suite=resolute-qcom (seeds into the resolute-qcom-seed branch)
 ```
 
-How it works ([`scripts/seed-history.sh`](../scripts/seed-history.sh)):
-
-- **Single-shot full clone** of the full history (see
-  [Launchpad and GitHub limits](#launchpad-and-github-limits-hard-won) for why
-  shallow `--deepen` cannot be used).
-- **Sliced push** in `< 2 GB` slices (the GitHub push cap, same section); the
-  upstream `Ubuntu-qcom-*` tags are pushed **verbatim**.
-- **Pushes to `resolute-qcom-seed`, never the live branch.** A human reviews and
-  promotes it (the production `resolute-qcom` branch is too valuable to clobber
-  automatically). The cloned repo is cached, so a retry after a failed publish
-  skips re-downloading the multi-GB history.
+How it works ([`scripts/seed-history.sh`](../scripts/seed-history.sh)): a
+single-shot full clone (shallow `--deepen` is unavailable, see
+[Launchpad and GitHub limits](#launchpad-and-github-limits)), pushed to
+`resolute-qcom-seed` in `< 2 GB` slices with the upstream `Ubuntu-qcom-*` tags. A
+human reviews and promotes it to the live branch; the clone is cached, so a failed
+publish can be retried without re-downloading.
 
 Once seeded and promoted,
 [`fetch-source-pkg.yml`](../.github/workflows/fetch-source-pkg.yml) keeps
@@ -174,8 +157,8 @@ Once seeded and promoted,
 
 ## Running a sync
 
-The sync takes **no inputs** - it always mirrors the latest carmel-team upload
-into `resolute-qcom`:
+The sync takes **no inputs** - it always mirrors the latest upstream upload into
+`resolute-qcom`:
 
 ```bash
 gh workflow run fetch-source-pkg.yml \
@@ -199,8 +182,8 @@ controls what is checked out:
 | *empty* | the selected branch HEAD (default `resolute-qcom-devel`) | build the current branch tip |
 | `X.Y.Z-A.B` | the tag `Ubuntu-qcom-X.Y.Z-A.B` (validated first; fails fast if absent) | build an exact mirrored upload |
 
-The only output is the `.deb` upload to **S3** (`lecore-production` runner). No
-GitHub Actions artifacts and no GitHub Releases are produced.
+The only output is the `.deb` upload to **S3**. No GitHub Actions artifacts and no
+GitHub Releases are produced.
 
 ## Workflows reference
 
@@ -216,7 +199,7 @@ Mirrors new upstream uploads into `resolute-qcom`, history-preserving, via
 | Job | What it does |
 |-----|-------------|
 | `check-version` | Two `ls-remote` calls (no clone): newest upstream `Ubuntu-qcom-*` tag vs our tags. Sets `should_sync`. |
-| `sync` | Bare-clones our mirror; for each un-mirrored upload (ascending): fetches the upstream tag (delta only), advances `resolute-qcom`, and atomically pushes the branch + the verbatim tag (lease-pinned, fail-fast). Never merges/rebases. |
+| `sync` | Bare-clones our mirror; for each un-mirrored upload (ascending): fetches the upstream tag (delta only), advances `resolute-qcom`, and atomically pushes the branch + the tag (lease-pinned, fail-fast). Never merges/rebases. |
 | `trigger-build` | Dispatches `build-kernel.yml` for the newest synced upload of the mirror (`suite=resolute-qcom`, `kernel_version=<synced version>`). |
 
 Idempotent: if the newest upload is already mirrored, the run exits without cloning
@@ -224,12 +207,12 @@ anything.
 
 ### `build-kernel.yml` - Build
 
-Checks out the kernel source (a verbatim tag, or the branch HEAD) and builds `.deb`
+Checks out the kernel source (a tag, or the branch HEAD) and builds `.deb`
 packages inside the base-suite-matched
 `ghcr.io/qualcomm-linux/pkg-builder:<base_suite>` container.
 
 - **Trigger**: dispatched by the sync, or manually.
-- **Output**: **S3 only** (`lecore-production` runner). No artifacts, no releases.
+- **Output**: **S3 only**. No artifacts, no releases.
 
 | Input | Default | Trigger | Description |
 |-------|---------|---------|-------------|
@@ -251,8 +234,8 @@ packages inside the base-suite-matched
    (see [Build container notes](#build-container-notes)).
 8. Collect `.deb` files and upload to S3 (skipped when `skip_s3=true`).
 
-**Self-hosted runner requirements** (`lecore-production`): Ubuntu 24.04 arm64,
-Docker (runner user in the `docker` group), ≥ 25 GB free disk.
+**Self-hosted runner requirements**: Ubuntu 24.04 arm64, Docker (runner user in the
+`docker` group), ≥ 25 GB free disk.
 
 ### Pre-merge validation
 
@@ -273,21 +256,15 @@ current branch HEAD) and uploads nothing (`skip_s3=true`).
   **not** carried on `main`); the reference copy is below.
 - **Security**: it uses `pull_request`, **not** `pull_request_target`, so the run
   has a read-only token and no secrets, and it builds the merge ref rather than a
-  raw attacker-controlled head. Contributor PRs come from **forks**, so the build
-  runs untrusted PR code (`debian/rules`) on the S3-credentialed
-  `lecore-production` runner. The repo **must** enable **"Require approval for all
-  fork pull requests"** (Settings > Actions > Fork pull request workflows) so a
-  maintainer reviews and approves each run before it executes - without it, this
-  is a pwn-request. Stronger still, and recommended before going public: run
-  pre-merge builds on a non-credentialed runner, or scope S3 to short-lived OIDC
-  so validation builds carry no write capability at all.
+  raw PR head. Builds are build-only (`skip_s3=true`) and upload nothing. Fork PRs
+  require maintainer approval before any workflow runs (Settings > Actions > Fork
+  pull request workflows).
 - **Concurrency**: one build per PR; a new push cancels the in-progress build.
 
-Before the check is added: `main` must already carry the `workflow_call` interface
-(added here), and the repo must have **"Require approval for all fork pull
-requests"** enabled (see Security above) so fork PRs cannot run code on the runner
-unreviewed. To make the check blocking, add **`Build check / Build`** as a required
-status check on the `resolute-qcom-devel` ruleset.
+Before the check is added: `main` must already carry the `workflow_call` interface,
+and the repo must have **"Require approval for all fork pull requests"** enabled
+(see Security above). To make the check blocking, add **`Build check / Build`** as a
+required status check on the `resolute-qcom-devel` ruleset.
 
 <details>
 <summary>Reference: <code>resolute-qcom-devel:.github/workflows/premerge-pr.yml</code></summary>
@@ -335,7 +312,7 @@ jobs:
 | Script | Purpose | Used by |
 |--------|---------|---------|
 | `scripts/sync-mirror.sh` | Incremental history-preserving mirror-repoint of new uploads | `fetch-source-pkg.yml` |
-| `scripts/seed-history.sh` | One-time full-history bootstrap of `resolute-qcom-seed` | `bootstrap-history.yml` |
+| `scripts/seed-history.sh` | One-time history bootstrap of `resolute-qcom-seed` | `bootstrap-history.yml` |
 
 `scripts/check-version.sh`, `scripts/fetch-source-pkg.sh`, and
 `scripts/build-kernel-deb.sh` are **legacy** standalone local helpers that predate
@@ -343,32 +320,17 @@ the mirror model; they are **not** part of the CI path.
 
 ## Build container notes
 
-### Build environment setup (`debian/rules clean`)
+A few build steps look odd but are load-bearing:
 
-Before compilation the build runs `fakeroot make -f debian/rules clean`, the
-standard Ubuntu kernel build setup path. The `clean` target:
-
-- Runs `debian/control` as a dependency, generating **`debian/canonical-certs.pem`**
-  (the X.509 cert the kernel's `certs/x509_certificate_list` target requires -
-  without it the build fails immediately) and **`debian/control`**.
-- Creates **`debian/changelog`** (the active derivative's changelog,
-  `debian.qcom/changelog`). `dh_installchangelogs`, run at the end of
-  `binary-qcom`, fails without it - after 2+ hours of compilation.
-- Removes stale build artifacts.
-
-**Why `fakeroot make -f debian/rules` and not `fakeroot debian/rules`?**
-`fakeroot` execs the command via `/bin/sh` (dash), which resolves the
-`#!/usr/bin/make -f` shebang at exec time; in the container that resolution fails
-silently with `debian/rules: not found (exit 127)`. Passing `make -f debian/rules`
-explicitly bypasses the shebang lookup.
-
-### Skipping the config policy check (`do_skip_checks=true`)
-
-The Ubuntu kernel build runs a config-policy check (`annotations --check`) that
-expects `CONFIG_RUST_IS_AVAILABLE=y`. In the `pkg-builder` container `bindgen` is
-unavailable, so `olddefconfig` drops that symbol and the policy diff fails. Passing
-`do_skip_checks=true` bypasses the check - the standard approach for non-official
-builds where optional toolchains are absent.
+- **`fakeroot make -f debian/rules clean` before compiling** (note `make -f`, not a
+  bare `debian/rules`): the standard Ubuntu kernel setup path. It generates the
+  signing cert, `debian/control`, and the derivative `debian/changelog` that later
+  targets require, and clears stale artifacts. The explicit `make -f` avoids a
+  shebang-resolution failure that otherwise aborts the build inside the container.
+- **`do_skip_checks=true`**: the config-policy check expects
+  `CONFIG_RUST_IS_AVAILABLE=y`, but `bindgen` is absent in the container so the
+  symbol drops and the check fails. Skipping it is the standard approach for
+  non-official builds where optional toolchains are missing.
 
 ## License
 
