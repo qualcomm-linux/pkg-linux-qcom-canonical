@@ -17,6 +17,13 @@
 name: "Build: Canonical Kernel .deb Packages"
 
 on:
+  # Daily build at 15:00 PST (23:00 UTC; GitHub cron runs in UTC). A scheduled run
+  # passes no inputs, so it builds resolute-qcom-devel HEAD (the SUITE default) on
+  # the lecore-production runner and uploads the .deb packages to S3 (skip_s3 is
+  # unset, so the upload step runs).
+  schedule:
+    - cron: "0 23 * * *"
+
   workflow_dispatch:
     inputs:
       suite:
