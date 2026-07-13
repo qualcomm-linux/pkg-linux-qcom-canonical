@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
 # SPDX-License-Identifier: BSD-3-Clause
 #
 # seed-history.sh - One-time automated bootstrap: seed a branch of this repo with

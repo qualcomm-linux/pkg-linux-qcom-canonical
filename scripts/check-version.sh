@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
 # SPDX-License-Identifier: BSD-3-Clause
 #
 # check-version.sh - Query the latest published kernel version from Launchpad
