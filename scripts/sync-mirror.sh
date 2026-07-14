@@ -152,11 +152,24 @@ mapfile -t UPSTREAM_VERSIONS < <(
 [ "${#UPSTREAM_VERSIONS[@]}" -gt 0 ] \
   || die "No ${UPSTREAM_PREFIX}-* tags found upstream."
 
+# "Missing" is judged against the tags ACTUALLY ON THE MIRROR (ls-remote origin),
+# NOT the local clone: the clone is --single-branch, so it only holds tags
+# reachable from the branch tip. A rebased/divergent upload we already mirrored is
+# invisible locally, and re-listing it here would make the atomic push below fail
+# with "tag already exists". This matches how the check-version gate decides what
+# is new (fetch-source-pkg.yml).
+mirror_raw="$(git ls-remote --tags origin "refs/tags/${UPSTREAM_PREFIX}-*")" \
+  || die "git ls-remote failed for the mirror (origin)."
+mirrored_versions="$(
+  printf '%s\n' "${mirror_raw}" \
+    | grep -v '\^{}' \
+    | sed -E "s#.*refs/tags/${UPSTREAM_PREFIX}-##" || true
+)"
+
 MISSING=()
 for ver in "${UPSTREAM_VERSIONS[@]}"; do
-  if ! git rev-parse -q --verify "refs/tags/${UPSTREAM_PREFIX}-${ver}" >/dev/null; then
-    MISSING+=("${ver}")
-  fi
+  # -F: the version is a fixed string (dots are literal, not globs).
+  grep -qxF "${ver}" <<<"${mirrored_versions}" || MISSING+=("${ver}")
 done
 
 if [ "${#MISSING[@]}" -eq 0 ]; then
@@ -232,6 +245,28 @@ Halting so the next run does not mask a partial sync (G3)."
   SYNCED=$((SYNCED + 1))
   LAST_VERSION="${ver}"
 done
+
+# ---------------------------------------------------------------------------
+# 5. Guarantee the branch ends at the NEWEST upload. The loop advances the branch
+#    as it mirrors, but a late-arriving OLDER upload (backfill) or a prior partial
+#    run can leave the branch behind the newest tag. Force it forward so the mirror
+#    HEAD is always the latest upload (a no-op when the loop already ended there).
+# ---------------------------------------------------------------------------
+newest="${UPSTREAM_VERSIONS[-1]}"
+newest_tag="${UPSTREAM_PREFIX}-${newest}"
+git rev-parse -q --verify "${newest_tag}^{commit}" >/dev/null 2>&1 \
+  || git fetch --no-tags origin   "refs/tags/${newest_tag}:refs/tags/${newest_tag}" 2>/dev/null \
+  || git fetch --no-tags upstream "refs/tags/${newest_tag}:refs/tags/${newest_tag}" \
+  || die "Could not obtain newest tag ${newest_tag} to position the branch."
+newest_sha="$(git rev-parse "${newest_tag}^{commit}")"
+current_sha="$(git rev-parse -q --verify "refs/heads/${BRANCH}" || true)"
+if [ "${newest_sha}" != "${current_sha}" ]; then
+  log "Advancing branch ${BRANCH} to newest upload ${newest} (${current_sha:0:12} -> ${newest_sha:0:12})..."
+  git update-ref "refs/heads/${BRANCH}" "${newest_sha}"
+  git push --force-with-lease="refs/heads/${BRANCH}:${current_sha}" origin "refs/heads/${BRANCH}" \
+    || die "Failed to advance branch to newest upload ${newest} (stale lease or protected ref). Halting (G3)."
+fi
+LAST_VERSION="${newest}"
 
 hr
 log "Sync complete: ${SYNCED} upload(s) mirrored; branch now at ${LAST_VERSION}."
