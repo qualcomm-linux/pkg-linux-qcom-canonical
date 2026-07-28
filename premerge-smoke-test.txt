@@ -1,0 +1,2 @@
+Smoke test for the pre-merge build check on resolute-qcom-devel.
+Safe to delete.
