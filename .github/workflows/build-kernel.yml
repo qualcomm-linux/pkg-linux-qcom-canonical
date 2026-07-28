@@ -40,6 +40,11 @@ on:
         required: false
         default: ""
         type: string
+      dbgsym:
+        description: "Build the -dbgsym.ddeb debug symbol packages alongside the .deb packages."
+        required: false
+        default: true
+        type: boolean
 
   workflow_call:
     inputs:
@@ -58,6 +63,11 @@ on:
         required: false
         default: ""
         type: string
+      dbgsym:
+        description: "Build the -dbgsym.ddeb debug symbol packages alongside the .deb packages."
+        required: false
+        default: true
+        type: boolean
       ref:
         description: "Exact git ref to checkout. Overrides suite/kernel_version when set (used by premerge-pr.yml to build the PR merge ref)."
         required: false
@@ -86,6 +96,7 @@ jobs:
       SUITE:   ${{ inputs.suite   || 'resolute-qcom-devel' }}
       ARCH:    arm64
       FLAVOR:  qcom
+      DBGSYM:  ${{ github.event_name == 'schedule' && 'true' || (inputs.dbgsym && 'true' || 'false') }}
 
     steps:
       # -----------------------------------------------------------------------
@@ -297,6 +308,7 @@ jobs:
             -e JOBS="${JOBS}" \
             -e TARGET="${TARGET}" \
             -e WS="${GITHUB_WORKSPACE}" \
+            -e DBGSYM="${DBGSYM}" \
             "ghcr.io/qualcomm-linux/pkg-builder:${BASE_SUITE}" \
             bash -c '
               set -euo pipefail
@@ -348,15 +360,19 @@ jobs:
               # CONFIG_RUST_IS_AVAILABLE=y — bindgen-0.65 is not available in
               # the container so Rust support is unavailable, causing the check
               # to fail. This is the standard approach for non-official builds.
-              fakeroot debian/rules ${TARGET} do_skip_checks=true
+              # do_dbgsym_package=true additionally builds the unstripped
+              # -dbgsym.ddeb (vmlinux + modules with full debug symbols).
+              DBGSYM_OPT="do_dbgsym_package=false"
+              if [ "${DBGSYM}" = "true" ]; then DBGSYM_OPT="do_dbgsym_package=true"; fi
+              fakeroot debian/rules ${TARGET} do_skip_checks=true "${DBGSYM_OPT}"
 
               kill "${HEARTBEAT}" 2>/dev/null || true
 
               echo "=== Locating built .deb files ==="
-              find "${WS}" -name "*.deb" | sort || true
+              find "${WS}" -name "*.deb" -o -name "*.ddeb" | sort || true
 
               mkdir -p "${WS}/output/"
-              find "${WS}" -name "*.deb" -exec cp {} "${WS}/output/" \;
+              find "${WS}" \( -name "*.deb" -o -name "*.ddeb" \) -exec cp {} "${WS}/output/" \;
               ls -lh "${WS}/output/" || echo "No .deb files found"
             '
 
@@ -370,7 +386,7 @@ jobs:
           mkdir -p output/
 
           find "${GITHUB_WORKSPACE}" -maxdepth 1 \
-            \( -name "*.deb" -o -name "*.changes" -o -name "*.buildinfo" \) \
+            \( -name "*.deb" -o -name "*.ddeb" -o -name "*.changes" -o -name "*.buildinfo" \) \
             -exec cp {} output/ \;
 
           echo "Built packages:"
@@ -404,6 +420,7 @@ jobs:
             echo "| Branch       | \`${SUITE}\` |"
             echo "| Architecture | \`${ARCH}\` |"
             echo "| Flavour      | \`${FLAVOR}\` |"
+            echo "| Dbgsym       | \`${DBGSYM}\` |"
             echo "| Container    | \`ghcr.io/qualcomm-linux/pkg-builder:${BASE_SUITE}\` |"
             echo "| Runner       | \`${{ runner.name }}\` |"
             if [ -n "${DEVEL_PRS}" ]; then
@@ -412,6 +429,6 @@ jobs:
             echo ""
             echo "### Built packages"
             echo '```'
-            ls -lh output/*.deb 2>/dev/null || echo "(none)"
+            ls -lh output/ 2>/dev/null || echo "(none)"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"

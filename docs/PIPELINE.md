@@ -48,7 +48,8 @@ All three workflows are manual (`Actions → … → Run workflow`, or via `gh`)
 gh workflow run fetch-source-pkg.yml --repo qualcomm-linux/pkg-linux-qcom-canonical
 
 # Build .deb packages. Defaults to resolute-qcom-devel HEAD; set the suite input to
-# resolute-qcom for the mirror, or kernel_version for an exact tag.
+# resolute-qcom for the mirror, or kernel_version for an exact tag. The dbgsym
+# input (default true) also builds the unstripped -dbgsym.ddeb.
 gh workflow run build-kernel.yml --repo qualcomm-linux/pkg-linux-qcom-canonical
 
 # One-time only, before the first sync: seed resolute-qcom with history (into
