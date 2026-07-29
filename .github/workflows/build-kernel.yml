@@ -95,7 +95,7 @@ jobs:
     env:
       SUITE:   ${{ inputs.suite   || 'resolute-qcom-devel' }}
       ARCH:    arm64
-      FLAVOR:  qcom
+      FLAVOR:  all
       DBGSYM:  ${{ github.event_name == 'schedule' && 'true' || (inputs.dbgsym && 'true' || 'false') }}
 
     steps:
