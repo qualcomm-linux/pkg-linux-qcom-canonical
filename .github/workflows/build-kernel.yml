@@ -370,27 +370,34 @@ jobs:
 
               echo "=== Locating built .deb files ==="
               find "${WS}" -name "*.deb" -o -name "*.ddeb" | sort || true
-
-              mkdir -p "${WS}/output/"
-              find "${WS}" \( -name "*.deb" -o -name "*.ddeb" \) -exec cp {} "${WS}/output/" \;
-              ls -lh "${WS}/output/" || echo "No .deb files found"
             '
 
       # -----------------------------------------------------------------------
       # 8. Collect output packages
       #    The Ubuntu kernel build drops .deb files one level above the
       #    source tree (i.e. in GITHUB_WORKSPACE, not inside kernel-src/).
+      #    qcom-rt flavour packages are split into output/rt/ so consumers can
+      #    tell the two flavours apart; qcom flavour + arch-indep packages
+      #    (e.g. linux-qcom-headers-*_all.deb) stay in output/.
       # -----------------------------------------------------------------------
       - name: Collect built packages
         run: |
-          mkdir -p output/
+          mkdir -p output/rt/
 
           find "${GITHUB_WORKSPACE}" -maxdepth 1 \
             \( -name "*.deb" -o -name "*.ddeb" -o -name "*.changes" -o -name "*.buildinfo" \) \
-            -exec cp {} output/ \;
+            -print0 | while IFS= read -r -d '' f; do
+              case "$(basename "$f")" in
+                *-qcom-rt_*|*-qcom-rt-dbgsym_*) dest="output/rt/" ;;
+                *)                              dest="output/"    ;;
+              esac
+              cp "$f" "$dest"
+            done
 
-          echo "Built packages:"
-          ls -lh output/ || echo "(no files found)"
+          echo "Built packages (qcom):"
+          ls -lh output/ 2>/dev/null | grep -v '^total\|^d' || echo "(no files found)"
+          echo "Built packages (qcom-rt):"
+          ls -lh output/rt/ || echo "(no files found)"
 
       # -----------------------------------------------------------------------
       # 9. Upload to S3 (lecore-production runner only)
@@ -427,8 +434,13 @@ jobs:
               echo "| Devel PRs    | \`${DEVEL_PRS}\` |"
             fi
             echo ""
-            echo "### Built packages"
+            echo "### Built packages (qcom)"
             echo '```'
-            ls -lh output/ 2>/dev/null || echo "(none)"
+            ls -lh output/ 2>/dev/null | grep -v '^total\|^d' || echo "(none)"
+            echo '```'
+            echo ""
+            echo "### Built packages (qcom-rt)"
+            echo '```'
+            ls -lh output/rt/ 2>/dev/null || echo "(none)"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
