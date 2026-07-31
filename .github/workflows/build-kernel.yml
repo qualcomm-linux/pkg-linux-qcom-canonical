@@ -377,8 +377,16 @@ jobs:
       #    The Ubuntu kernel build drops .deb files one level above the
       #    source tree (i.e. in GITHUB_WORKSPACE, not inside kernel-src/).
       #    qcom-rt flavour packages are split into output/rt/ so consumers can
-      #    tell the two flavours apart; qcom flavour + arch-indep packages
-      #    (e.g. linux-qcom-headers-*_all.deb) stay in output/.
+      #    tell the two flavours apart; qcom flavour packages stay in output/.
+      #
+      #    linux-qcom-headers-* and linux-qcom-tools-* are "Architecture: all"
+      #    at the source level, so there is a single shared .deb per ABI
+      #    rather than one per flavour, and they land in output/ (they don't
+      #    match the -qcom-rt filename pattern above). linux-headers-*-qcom-rt
+      #    depends on linux-qcom-headers-*, and a future linux-tools-*-qcom-rt
+      #    would similarly depend on linux-qcom-tools-*, so both are also
+      #    copied (not moved — qcom needs its own copy in output/ too) into
+      #    output/rt/ to keep that folder self-contained.
       # -----------------------------------------------------------------------
       - name: Collect built packages
         run: |
@@ -392,6 +400,12 @@ jobs:
                 *)                              dest="output/"    ;;
               esac
               cp "$f" "$dest"
+            done
+
+          find output -maxdepth 1 \
+            \( -name "linux-qcom-headers-*" -o -name "linux-qcom-tools-*" \) \
+            -print0 | while IFS= read -r -d '' f; do
+              cp "$f" output/rt/
             done
 
           echo "Built packages (qcom):"
