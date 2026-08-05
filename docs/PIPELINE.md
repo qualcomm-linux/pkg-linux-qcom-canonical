@@ -57,6 +57,10 @@ gh workflow run build-kernel.yml --repo qualcomm-linux/pkg-linux-qcom-canonical
 gh workflow run bootstrap-history.yml --repo qualcomm-linux/pkg-linux-qcom-canonical
 ```
 
-PRs into `resolute-qcom-devel` get a build-only pre-merge check (`premerge-pr.yml`
-on that branch), which calls `build-kernel.yml` with `skip_s3=true`.
+PRs into `resolute-qcom-devel` get a pre-merge build check (`premerge-pr.yml` on
+that branch), which calls `build-kernel.yml` with `flavours=qcom`,
+`dbgsym=false`, and `s3_prefix=premerge` (binary-indep is always built
+regardless of `flavours`). Its packages are uploaded to S3 under
+`pkg/premerge/`, separate from the `pkg/temp/` prefix used by nightly and
+manual `workflow_dispatch` runs.
 

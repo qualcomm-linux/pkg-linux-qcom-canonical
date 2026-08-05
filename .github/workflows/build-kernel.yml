@@ -45,6 +45,11 @@ on:
         required: false
         default: true
         type: boolean
+      flavours:
+        description: "ALL builds every flavour. Otherwise a space-separated list of flavour names (e.g. 'qcom', 'qcom qcom-rt'), no 'binary-' prefix."
+        required: false
+        default: "ALL"
+        type: string
 
   workflow_call:
     inputs:
@@ -78,6 +83,16 @@ on:
         required: false
         default: false
         type: boolean
+      flavours:
+        description: "ALL builds every flavour. Otherwise a space-separated list of flavour names (e.g. 'qcom', 'qcom qcom-rt'), no 'binary-' prefix."
+        required: false
+        default: "ALL"
+        type: string
+      s3_prefix:
+        description: "S3 path prefix under pkg/ (e.g. 'premerge', 'temp'). Callers must pass this explicitly."
+        required: false
+        default: "temp"
+        type: string
 
 permissions:
   contents: read    # checkout + tag ls-remote only; output goes to S3
@@ -95,7 +110,7 @@ jobs:
     env:
       SUITE:   ${{ inputs.suite   || 'resolute-qcom-devel' }}
       ARCH:    arm64
-      FLAVOR:  all
+      FLAVOURS: ${{ inputs.flavours || 'ALL' }}
       DBGSYM:  ${{ github.event_name == 'schedule' && 'true' || (inputs.dbgsym && 'true' || 'false') }}
 
     steps:
@@ -294,7 +309,18 @@ jobs:
       - name: Build kernel packages (ghcr.io/qualcomm-linux/pkg-builder:${{ inputs.suite || 'resolute-qcom' }})
         run: |
           JOBS=$(nproc)
-          if [ "${FLAVOR}" = "all" ]; then TARGET="binary"; else TARGET="binary-${FLAVOR} binary-indep"; fi
+          FLAVOURS_LC=$(echo "${FLAVOURS}" | tr '[:upper:]' '[:lower:]')
+          # binary-indep is always built alongside the selected flavours —
+          # linux-headers-* and linux-tools-* packages depend on it, so it
+          # can't be made optional here.
+          if [ "${FLAVOURS_LC}" = "all" ]; then
+            TARGET="binary"
+          else
+            TARGET="binary-indep"
+            for f in ${FLAVOURS_LC}; do
+              TARGET="${TARGET} binary-${f}"
+            done
+          fi
 
           echo "Building: suite=${SUITE}  base_suite=${BASE_SUITE}  target=${TARGET}  arch=${ARCH}  jobs=${JOBS}"
 
@@ -416,6 +442,9 @@ jobs:
       # -----------------------------------------------------------------------
       # 9. Upload to S3 (lecore-production runner only)
       #    Skipped when skip_s3 is set (premerge-pr.yml build-only checks).
+      #    Destination prefix is the caller-supplied s3_prefix input, not
+      #    inferred from github.event_name: a reusable workflow inherits the
+      #    caller's original event, so it is never actually "workflow_call".
       # -----------------------------------------------------------------------
       - name: Upload kernel .deb packages to S3
         if: inputs.skip_s3 != true
@@ -423,7 +452,7 @@ jobs:
         with:
           s3_bucket: qli-prd-lecore-gh-artifacts
           path: ${{ github.workspace }}/output
-          destination: ${{ env.ORG_NAME }}/pkg/temp/${{ env.REPO_NAME }}/${{ github.run_id }}-${{ github.run_attempt }}/
+          destination: ${{ env.ORG_NAME }}/pkg/${{ inputs.s3_prefix || 'temp' }}/${{ env.REPO_NAME }}/${{ github.run_id }}-${{ github.run_attempt }}/
 
       # -----------------------------------------------------------------------
       # 10. Summary
@@ -440,7 +469,7 @@ jobs:
             echo "|-------|-------|"
             echo "| Branch       | \`${SUITE}\` |"
             echo "| Architecture | \`${ARCH}\` |"
-            echo "| Flavour      | \`${FLAVOR}\` |"
+            echo "| Flavour      | \`${FLAVOURS}\` |"
             echo "| Dbgsym       | \`${DBGSYM}\` |"
             echo "| Container    | \`ghcr.io/qualcomm-linux/pkg-builder:${BASE_SUITE}\` |"
             echo "| Runner       | \`${{ runner.name }}\` |"
