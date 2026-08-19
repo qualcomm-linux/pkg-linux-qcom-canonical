@@ -1824,8 +1824,8 @@ CONFIG_QCOM_HIDMA                               policy<{'arm64': 'y'}>
 CONFIG_QCOM_HIDMA_MGMT                          policy<{'arm64': 'y'}>
 CONFIG_QCOM_INLINE_CRYPTO_ENGINE                policy<{'arm64': 'y'}>
 CONFIG_QCOM_KVM_ENABLED                         policy<{'arm64': '-'}>
-CONFIG_QCOM_MEMORY_DUMP_DEV                     policy<{'arm64': '-'}>
-CONFIG_QCOM_MEMORY_DUMP_V2                      policy<{'arm64': '-'}>
+CONFIG_QCOM_MEMORY_DUMP_DEV                     policy<{'arm64': 'y'}>
+CONFIG_QCOM_MEMORY_DUMP_V2                      policy<{'arm64': 'y'}>
 CONFIG_QCOM_MEM_BUF                             policy<{'arm64': '-'}>
 CONFIG_QCOM_MEM_BUF_DEV                         policy<{'arm64': '-'}>
 CONFIG_QCOM_MINIDUMP                            policy<{'arm64': '-'}>
