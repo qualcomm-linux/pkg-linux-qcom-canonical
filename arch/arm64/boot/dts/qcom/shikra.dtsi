@@ -96,12 +96,17 @@
 		};
 	};
 
-	firmware {
-		scm {
-			compatible = "qcom,scm-shikra", "qcom,scm";
-			qcom,dload-mode = <&tcsr_regs 0x13000>;
-			interconnects = <&system_noc MASTER_CRYPTO_CORE0 RPM_ALWAYS_TAG
-					 &mc_virt SLAVE_EBI_CH0 RPM_ALWAYS_TAG>;
+	clocks {
+		xo_board: xo-board {
+			compatible = "fixed-clock";
+			clock-frequency = <38400000>;
+			#clock-cells = <0>;
+		};
+
+		sleep_clk: sleep-clk {
+			compatible = "fixed-clock";
+			clock-frequency = <32764>;
+			#clock-cells = <0>;
 		};
 	};
 
@@ -330,11 +335,6 @@
 			compatible = "qcom,tcsr-mutex";
 			reg = <0x0 0x00340000 0x0 0x20000>;
 			#hwlock-cells = <1>;
-		};
-
-		tcsr_regs: syscon@3c0000 {
-			compatible = "qcom,shikra-tcsr", "syscon";
-			reg = <0x0 0x003c0000 0x0 0x40000>;
 		};
 
 		tlmm: pinctrl@500000 {
