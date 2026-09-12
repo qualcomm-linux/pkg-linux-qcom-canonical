@@ -281,11 +281,6 @@
 		interrupts = <GIC_PPI 5 IRQ_TYPE_LEVEL_HIGH>;
 	};
 
-	psci: psci {
-		compatible = "arm,psci-1.0";
-		method = "smc";
-	};
-
 	rpm: remoteproc {
 		compatible = "qcom,shikra-rpm-proc", "qcom,rpm-proc";
 
