@@ -49,7 +49,6 @@ properties:
               - qcom,qcs615-apss-shared
               - qcom,sc7180-apss-shared
               - qcom,sc8180x-apss-shared
-              - qcom,shikra-apss-shared
               - qcom,sm7150-apss-shared
               - qcom,sm8150-apss-shared
           - const: qcom,sdm845-apss-shared
@@ -67,6 +66,7 @@ properties:
           - qcom,qcm2290-apcs-hmss-global
           - qcom,shikra-apcs-hmss-global
           - qcom,sdm845-apss-shared
+          - qcom,shikra-apcs-hmss-global
 
   reg:
     maxItems: 1
@@ -241,6 +241,7 @@ allOf:
               - qcom,qcm2290-apcs-hmss-global
               - qcom,shikra-apcs-hmss-global
               - qcom,sdm845-apss-shared
+              - qcom,shikra-apcs-hmss-global
     then:
       properties:
         clocks: false
