@@ -1577,55 +1577,6 @@ static const struct qcom_pas_data sc7280_wpss_resource = {
 	.ssctl_id = 0x19,
 };
 
-static const struct qcom_pas_data shikra_cdsp_resource = {
-	.crash_reason_smem = 601,
-	.firmware_name = "cdsp.mbn",
-	.pas_id = 18,
-	.minidump_id = 7,
-	.auto_boot = false,
-	.proxy_pd_names = (char *[]){
-		"cx",
-		NULL
-	},
-	.load_state = "cdsp",
-	.ssr_name = "cdsp",
-	.sysmon_name = "cdsp",
-	.ssctl_id = 0x17,
-	.smem_host_id = 5,
-	.region_assign_vmid = QCOM_SCM_VMID_CDSP,
-};
-
-static const struct qcom_pas_data shikra_lpaicp_resource = {
-	.crash_reason_smem = 682,
-	.firmware_name = "lpaicp.mbn",
-	.dtb_firmware_name = "lpaicp_dtb.mbn",
-	.pas_id = 0x56,
-	.dtb_pas_id = 0x57,
-	/* placeholder for lpaicp subsystem dump collection id to be added */
-	.minidump_id = 0,
-	.auto_boot = true,
-	.ssr_name = "lpaicp",
-	.sysmon_name = "lpaicp",
-};
-
-static const struct qcom_pas_data shikra_mpss_resource = {
-	.crash_reason_smem = 421,
-	.firmware_name = "qdsp6sw.mbn",
-	.pas_id = 4,
-	.minidump_id = 3,
-	.auto_boot = false,
-	.decrypt_shutdown = true,
-	.proxy_pd_names = (char *[]){
-		"cx",
-		NULL
-	},
-	.load_state = "modem",
-	.ssr_name = "mpss",
-	.sysmon_name = "modem",
-	.ssctl_id = 0x12,
-	.region_assign_vmid = QCOM_SCM_VMID_MSS_MSA,
-};
-
 static const struct qcom_pas_data sm8650_cdsp_resource = {
 	.crash_reason_smem = 601,
 	.firmware_name = "cdsp.mdt",
@@ -1717,17 +1668,19 @@ static const struct qcom_pas_data kaanapali_soccp_resource = {
 };
 
 static const struct of_device_id qcom_pas_of_match[] = {
-	{ .compatible = "qcom,milos-adsp-pas", .data = &sm8550_adsp_resource},
-	{ .compatible = "qcom,milos-cdsp-pas", .data = &milos_cdsp_resource},
-	{ .compatible = "qcom,milos-mpss-pas", .data = &sm8450_mpss_resource},
-	{ .compatible = "qcom,milos-wpss-pas", .data = &sc7280_wpss_resource},
-	{ .compatible = "qcom,msm8226-adsp-pil", .data = &msm8996_adsp_resource},
-	{ .compatible = "qcom,msm8953-adsp-pil", .data = &msm8996_adsp_resource},
-	{ .compatible = "qcom,msm8974-adsp-pil", .data = &msm8996_adsp_resource},
-	{ .compatible = "qcom,msm8996-adsp-pil", .data = &msm8996_adsp_resource},
-	{ .compatible = "qcom,msm8996-slpi-pil", .data = &msm8996_slpi_resource_init},
-	{ .compatible = "qcom,msm8998-adsp-pas", .data = &msm8996_adsp_resource},
-	{ .compatible = "qcom,msm8998-slpi-pas", .data = &msm8996_slpi_resource_init},
+	{ .compatible = "qcom,eliza-adsp-pas", .data = &sm8550_adsp_resource },
+	{ .compatible = "qcom,kaanapali-soccp-pas", .data = &kaanapali_soccp_resource },
+	{ .compatible = "qcom,milos-adsp-pas", .data = &sm8550_adsp_resource },
+	{ .compatible = "qcom,milos-cdsp-pas", .data = &milos_cdsp_resource },
+	{ .compatible = "qcom,milos-mpss-pas", .data = &sm8450_mpss_resource },
+	{ .compatible = "qcom,milos-wpss-pas", .data = &sc7280_wpss_resource },
+	{ .compatible = "qcom,msm8226-adsp-pil", .data = &msm8996_adsp_resource },
+	{ .compatible = "qcom,msm8953-adsp-pil", .data = &msm8996_adsp_resource },
+	{ .compatible = "qcom,msm8974-adsp-pil", .data = &msm8996_adsp_resource },
+	{ .compatible = "qcom,msm8996-adsp-pil", .data = &msm8996_adsp_resource },
+	{ .compatible = "qcom,msm8996-slpi-pil", .data = &msm8996_slpi_resource_init },
+	{ .compatible = "qcom,msm8998-adsp-pas", .data = &msm8996_adsp_resource },
+	{ .compatible = "qcom,msm8998-slpi-pas", .data = &msm8996_slpi_resource_init },
 	{ .compatible = "qcom,qcs404-adsp-pas", .data = &adsp_resource_init },
 	{ .compatible = "qcom,qcs404-cdsp-pas", .data = &cdsp_resource_init },
 	{ .compatible = "qcom,qcs404-wcss-pas", .data = &wcss_resource_init },
@@ -1756,9 +1709,6 @@ static const struct of_device_id qcom_pas_of_match[] = {
 	{ .compatible = "qcom,sdm845-slpi-pas", .data = &sdm845_slpi_resource_init},
 	{ .compatible = "qcom,sdx55-mpss-pas", .data = &sdx55_mpss_resource},
 	{ .compatible = "qcom,sdx75-mpss-pas", .data = &sm8650_mpss_resource},
-	{ .compatible = "qcom,shikra-cdsp-pas", .data = &shikra_cdsp_resource },
-	{ .compatible = "qcom,shikra-lpaicp-pas", .data = &shikra_lpaicp_resource },
-	{ .compatible = "qcom,shikra-mpss-pas", .data = &shikra_mpss_resource },
 	{ .compatible = "qcom,sm6115-adsp-pas", .data = &adsp_resource_init},
 	{ .compatible = "qcom,sm6115-cdsp-pas", .data = &cdsp_resource_init},
 	{ .compatible = "qcom,sm6115-mpss-pas", .data = &sc8180x_mpss_resource},
