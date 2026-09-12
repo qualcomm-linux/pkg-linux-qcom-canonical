@@ -34,7 +34,6 @@ properties:
       - qcom,sc8180x-llcc
       - qcom,sc8280xp-llcc
       - qcom,sdm845-llcc
-      - qcom,shikra-llcc
       - qcom,sm6350-llcc
       - qcom,sm7150-llcc
       - qcom,sm8150-llcc
@@ -205,8 +204,6 @@ allOf:
           contains:
             enum:
               - qcom,sc7280-llcc
-              - qcom,sdm670-llcc
-              - qcom,shikra-llcc
     then:
       properties:
         reg:
