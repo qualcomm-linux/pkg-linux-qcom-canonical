@@ -12,8 +12,3 @@
  * Sensor DC
  * NFC DC
  */
-
-&qupv3_0 {
-	firmware-name = "qcom/shikra/qupv3fw.elf";
-	status = "okay";
-};
