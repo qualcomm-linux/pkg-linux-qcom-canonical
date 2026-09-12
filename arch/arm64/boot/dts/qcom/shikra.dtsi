@@ -1407,7 +1407,7 @@
 		};
 
 		apcs_glb: mailbox@f400000 {
-			compatible = "qcom,shikra-apss-shared", "qcom,sdm845-apss-shared";
+			compatible = "qcom,shikra-apcs-hmss-global";
 			reg = <0x0 0x0f400000 0x0 0x1000>;
 			#mbox-cells = <1>;
 		};
