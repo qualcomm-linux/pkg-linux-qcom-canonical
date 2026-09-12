@@ -120,7 +120,7 @@
 			enable-method = "psci";
 			next-level-cache = <&l2_3>;
 			capacity-dmips-mhz = <1946>;
-			dynamic-power-coefficient = <489>;
+			dynamic-power-coefficient = <486>;
 			clocks = <&cpufreq_hw 1>;
 			qcom,freq-domain = <&cpufreq_hw 1>;
 			#cooling-cells = <2>;
@@ -135,7 +135,6 @@
 				cache-level = <2>;
 				cache-unified;
 				next-level-cache = <&l3>;
-				cache-size = <0x40000>;
 			};
 		};
 
@@ -165,7 +164,6 @@
 			compatible = "cache";
 			cache-level = <3>;
 			cache-unified;
-			cache-size = <0x80000>;
 		};
 	};
 
