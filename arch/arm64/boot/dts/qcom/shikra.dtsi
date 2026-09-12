@@ -296,7 +296,7 @@
 
 		glink-edge {
 			compatible = "qcom,glink-rpm";
-			interrupts = <GIC_SPI 194 IRQ_TYPE_EDGE_RISING 0>;
+			interrupts = <GIC_SPI 194 IRQ_TYPE_EDGE_RISING>;
 			qcom,rpm-msg-ram = <&rpm_msg_ram>;
 			mboxes = <&apcs_glb 0>;
 
@@ -358,7 +358,7 @@
 		mpm: interrupt-controller {
 			compatible = "qcom,mpm";
 			qcom,rpm-msg-ram = <&apss_mpm>;
-			interrupts = <GIC_SPI 197 IRQ_TYPE_EDGE_RISING 0>;
+			interrupts = <GIC_SPI 197 IRQ_TYPE_EDGE_RISING>;
 			mboxes = <&apcs_glb 1>;
 			interrupt-controller;
 			#interrupt-cells = <2>;
@@ -477,7 +477,7 @@
 		compatible = "qcom,smp2p";
 		qcom,smem = <94>, <432>;
 
-		interrupts = <GIC_SPI 263 IRQ_TYPE_EDGE_RISING 0>;
+		interrupts = <GIC_SPI 263 IRQ_TYPE_EDGE_RISING>;
 
 		mboxes = <&apcs_glb 6>;
 
@@ -500,7 +500,7 @@
 		compatible = "qcom,smp2p";
 		qcom,smem = <617>, <616>;
 
-		interrupts = <GIC_SPI 287 IRQ_TYPE_EDGE_RISING 0>;
+		interrupts = <GIC_SPI 287 IRQ_TYPE_EDGE_RISING>;
 
 		mboxes = <&apcs_glb 10>;
 
@@ -523,7 +523,7 @@
 		compatible = "qcom,smp2p";
 		qcom,smem = <435>, <428>;
 
-		interrupts = <GIC_SPI 70 IRQ_TYPE_EDGE_RISING 0>;
+		interrupts = <GIC_SPI 70 IRQ_TYPE_EDGE_RISING>;
 
 		mboxes = <&apcs_glb 14>;
 
@@ -557,7 +557,7 @@
 
 		modem_smsm: modem@1 {
 			reg = <1>;
-			interrupts = <GIC_SPI 69 IRQ_TYPE_EDGE_RISING 0>;
+			interrupts = <GIC_SPI 69 IRQ_TYPE_EDGE_RISING>;
 
 			interrupt-controller;
 			#interrupt-cells = <2>;
@@ -587,7 +587,7 @@
 			compatible = "qcom,shikra-tlmm";
 			reg = <0x0 0x00500000 0x0 0x800000>;
 
-			interrupts = <GIC_SPI 227 IRQ_TYPE_LEVEL_HIGH 0>;
+			interrupts = <GIC_SPI 227 IRQ_TYPE_LEVEL_HIGH>;
 
 			gpio-controller;
 			#gpio-cells = <2>;
@@ -1021,7 +1021,7 @@
 			compatible = "qcom,shikra-cpu-bwmon", "qcom,sc7280-llcc-bwmon";
 			reg = <0x0 0x00c91000 0x0 0x1000>;
 
-			interrupts = <GIC_SPI 468 IRQ_TYPE_LEVEL_HIGH 0>;
+			interrupts = <GIC_SPI 468 IRQ_TYPE_LEVEL_HIGH>;
 
 			interconnects = <&mem_noc MASTER_AMPSS_M0 RPM_ACTIVE_TAG
 					 &mc_virt SLAVE_EBI_CH0 RPM_ACTIVE_TAG>;
@@ -1071,7 +1071,7 @@
 			      <0x0 0x0f00000 0x0 0x80000>,
 			      <0x0 0x1000000 0x0 0x80000>;
 			reg-names = "llcc0_base", "llcc1_base", "llcc_broadcast_base";
-			interrupts = <GIC_SPI 571 IRQ_TYPE_LEVEL_HIGH 0>;
+			interrupts = <GIC_SPI 571 IRQ_TYPE_LEVEL_HIGH>;
 		};
 
 		gcc: clock-controller@1400000 {
@@ -1198,7 +1198,7 @@
 		cryptobam: dma-controller@1b04000 {
 			compatible = "qcom,bam-v1.7.4", "qcom,bam-v1.7.0";
 			reg = <0x0 0x01b04000 0x0 0x24000>;
-			interrupts = <GIC_SPI 247 IRQ_TYPE_LEVEL_HIGH 0>;
+			interrupts = <GIC_SPI 247 IRQ_TYPE_LEVEL_HIGH>;
 			#dma-cells = <1>;
 			iommus = <&apps_smmu 0x84 0x0011>,
 				 <&apps_smmu 0x86 0x0011>,
@@ -1273,8 +1273,8 @@
 			compatible = "qcom,shikra-tsens", "qcom,tsens-v2";
 			reg = <0x0 0x04411000 0x0 0x1000>,
 			      <0x0 0x04410000 0x0 0x1000>;
-			interrupts = <GIC_SPI 275 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 190 IRQ_TYPE_LEVEL_HIGH 0>;
+			interrupts = <GIC_SPI 275 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 190 IRQ_TYPE_LEVEL_HIGH>;
 			interrupt-names = "uplow",
 					  "critical";
 			#qcom,sensors = <14>;
@@ -1314,8 +1314,8 @@
 
 			iommus = <&apps_smmu 0xc0 0x0>;
 
-			interrupts = <GIC_SPI 348 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 352 IRQ_TYPE_LEVEL_HIGH 0>;
+			interrupts = <GIC_SPI 348 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 352 IRQ_TYPE_LEVEL_HIGH>;
 			interrupt-names = "hc_irq",
 					  "pwr_irq";
 
@@ -1374,8 +1374,8 @@
 			compatible = "qcom,shikra-sdhci", "qcom,sdhci-msm-v5";
 			reg = <0x0 0x4784000 0x0 0x1000>;
 
-			interrupts = <GIC_SPI 350 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 353 IRQ_TYPE_LEVEL_HIGH 0>;
+			interrupts = <GIC_SPI 350 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 353 IRQ_TYPE_LEVEL_HIGH>;
 			interrupt-names = "hc_irq", "pwr_irq";
 
 			bus-width = <4>;
@@ -1435,10 +1435,10 @@
 					  <&gcc GCC_USB30_PRIM_MASTER_CLK>;
 			assigned-clock-rates = <19200000>, <133333333>;
 
-			interrupts-extended = <&intc GIC_SPI 255 IRQ_TYPE_LEVEL_HIGH 0>,
-					      <&intc GIC_SPI 302 IRQ_TYPE_LEVEL_HIGH 0>,
-					      <&intc GIC_SPI 260 IRQ_TYPE_LEVEL_HIGH 0>,
-					      <&intc GIC_SPI 422 IRQ_TYPE_LEVEL_HIGH 0>;
+			interrupts-extended = <&intc GIC_SPI 255 IRQ_TYPE_LEVEL_HIGH>,
+					      <&intc GIC_SPI 302 IRQ_TYPE_LEVEL_HIGH>,
+					      <&intc GIC_SPI 260 IRQ_TYPE_LEVEL_HIGH>,
+					      <&intc GIC_SPI 422 IRQ_TYPE_LEVEL_HIGH>;
 			interrupt-names = "dwc_usb3",
 					  "pwr_event",
 					  "qusb2_phy",
@@ -1496,7 +1496,7 @@
 				    "cx_mem",
 				    "cx_dbgc";
 
-			interrupts = <GIC_SPI 177 IRQ_TYPE_LEVEL_HIGH 0>;
+			interrupts = <GIC_SPI 177 IRQ_TYPE_LEVEL_HIGH>;
 
 			clocks = <&gpucc GPU_CC_GX_GFX3D_CLK>,
 				 <&gpucc GPU_CC_AHB_CLK>,
@@ -1603,15 +1603,15 @@
 			#iommu-cells = <2>;
 			#global-interrupts = <1>;
 
-			interrupts = <GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 167 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 168 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 169 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 171 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 172 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 173 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH 0>;
+			interrupts = <GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 167 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 168 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 169 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 171 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 172 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 173 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
 
 			clocks = <&gpucc GPU_CC_GPU_SMMU_VOTE_CLK>,
 				<&gcc GCC_GPU_MEMNOC_GFX_CLK>,
@@ -1628,7 +1628,7 @@
 		iris: video-codec@5a00000 {
 			compatible = "qcom,shikra-iris", "qcom,qcm2290-venus";
 			reg = <0 0x5a00000 0 0x200000>;
-			interrupts = <GIC_SPI 225 IRQ_TYPE_LEVEL_HIGH 0>;
+			interrupts = <GIC_SPI 225 IRQ_TYPE_LEVEL_HIGH>;
 
 			power-domains = <&gcc GCC_VENUS_GDSC>,
 					<&gcc GCC_VCODEC0_GDSC>,
@@ -1739,14 +1739,14 @@
 				      "vfe1",
 				      "vfe1_cphy_rx";
 
-			interrupts = <GIC_SPI 210 IRQ_TYPE_EDGE_RISING 0>,
-				     <GIC_SPI 212 IRQ_TYPE_EDGE_RISING 0>,
-				     <GIC_SPI 72 IRQ_TYPE_EDGE_RISING 0>,
-				     <GIC_SPI 73 IRQ_TYPE_EDGE_RISING 0>,
-				     <GIC_SPI 309 IRQ_TYPE_EDGE_RISING 0>,
-				     <GIC_SPI 310 IRQ_TYPE_EDGE_RISING 0>,
-				     <GIC_SPI 211 IRQ_TYPE_EDGE_RISING 0>,
-				     <GIC_SPI 213 IRQ_TYPE_EDGE_RISING 0>;
+			interrupts = <GIC_SPI 210 IRQ_TYPE_EDGE_RISING>,
+				     <GIC_SPI 212 IRQ_TYPE_EDGE_RISING>,
+				     <GIC_SPI 72 IRQ_TYPE_EDGE_RISING>,
+				     <GIC_SPI 73 IRQ_TYPE_EDGE_RISING>,
+				     <GIC_SPI 309 IRQ_TYPE_EDGE_RISING>,
+				     <GIC_SPI 310 IRQ_TYPE_EDGE_RISING>,
+				     <GIC_SPI 211 IRQ_TYPE_EDGE_RISING>,
+				     <GIC_SPI 213 IRQ_TYPE_EDGE_RISING>;
 			interrupt-names = "csid0",
 					  "csid1",
 					  "csiphy0",
@@ -1790,7 +1790,7 @@
 			compatible = "qcom,shikra-cci", "qcom,msm8996-cci";
 
 			reg = <0x0 0x05c1b000 0x0 0x1000>;
-			interrupts = <GIC_SPI 206 IRQ_TYPE_EDGE_RISING 0>;
+			interrupts = <GIC_SPI 206 IRQ_TYPE_EDGE_RISING>;
 			power-domains = <&gcc GCC_CAMSS_TOP_GDSC>;
 			clocks = <&gcc GCC_CAMSS_TOP_AHB_CLK>,
 				 <&gcc GCC_CAMSS_CCI_0_CLK>;
@@ -1825,7 +1825,7 @@
 			compatible = "qcom,shikra-mdss";
 			reg = <0x0 0x05e00000 0x0 0x1000>;
 			reg-names = "mdss";
-			interrupts = <GIC_SPI 186 IRQ_TYPE_LEVEL_HIGH 0>;
+			interrupts = <GIC_SPI 186 IRQ_TYPE_LEVEL_HIGH>;
 			interrupt-controller;
 			#interrupt-cells = <1>;
 
@@ -2053,71 +2053,71 @@
 			#iommu-cells = <2>;
 			#global-interrupts = <1>;
 
-			interrupts = <GIC_SPI 81 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 92 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 95 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 109 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 124 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 125 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 126 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 128 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 129 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 130 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 132 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 133 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 134 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 135 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 136 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 137 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 138 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 139 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 140 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 141 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 143 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH 0>;
+			interrupts = <GIC_SPI 81 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 92 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 95 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 109 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 124 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 125 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 126 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 128 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 129 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 130 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 132 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 133 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 134 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 135 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 136 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 137 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 138 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 139 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 140 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 141 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 143 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>;
 		};
 
 		wifi: wifi@c800000 {
@@ -2125,18 +2125,18 @@
 			reg = <0x0 0x0c800000 0x0 0x800000>;
 			reg-names = "membase";
 			memory-region = <&wlan_mem>;
-			interrupts = <GIC_SPI 358 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 359 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 360 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 361 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 362 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 363 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 364 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 365 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 366 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 367 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 368 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 369 IRQ_TYPE_LEVEL_HIGH 0>;
+			interrupts = <GIC_SPI 358 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 359 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 360 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 361 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 362 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 363 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 364 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 365 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 366 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 367 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 368 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 369 IRQ_TYPE_LEVEL_HIGH>;
 			iommus = <&apps_smmu 0x1a0 0x1>;
 			qcom,msa-fixed-perm;
 
@@ -2148,9 +2148,9 @@
 			reg = <0x0 0xf200000 0x0 0x10000>, /* GICD */
 			      <0x0 0xf240000 0x0 0x80000>; /* GICR * 4 regions */
 
-			interrupts = <GIC_PPI 8 IRQ_TYPE_LEVEL_HIGH 0>;
+			interrupts = <GIC_PPI 8 IRQ_TYPE_LEVEL_HIGH>;
 
-			#interrupt-cells = <4>;
+			#interrupt-cells = <3>;
 			interrupt-controller;
 
 			#redistributor-regions = <1>;
@@ -2180,8 +2180,8 @@
 		watchdog@f410000 {
 			compatible = "qcom,apss-wdt-shikra", "qcom,kpss-wdt";
 			reg = <0x0 0x0f410000 0x0 0x1000>;
-			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH 0>;
+			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&sleep_clk>;
 		};
 
@@ -2197,49 +2197,49 @@
 				reg = <0x0f421000 0x1000>,
 				      <0x0f422000 0x1000>;
 				frame-number = <0>;
-				interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH 0>,
-					     <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH 0>;
+				interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>,
+					     <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
 			};
 
 			frame@f423000 {
 				reg = <0x0f423000 0x1000>;
 				frame-number = <1>;
-				interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH 0>;
+				interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
 				status = "disabled";
 			};
 
 			frame@f425000 {
 				reg = <0x0f425000 0x1000>;
 				frame-number = <2>;
-				interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH 0>;
+				interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
 				status = "disabled";
 			};
 
 			frame@f427000 {
 				reg = <0x0f427000 0x1000>;
 				frame-number = <3>;
-				interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH 0>;
+				interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
 				status = "disabled";
 			};
 
 			frame@f429000 {
 				reg = <0x0f429000 0x1000>;
 				frame-number = <4>;
-				interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH 0>;
+				interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
 				status = "disabled";
 			};
 
 			frame@f42b000 {
 				reg = <0x0f42b000 0x1000>;
 				frame-number = <5>;
-				interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH 0>;
+				interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
 				status = "disabled";
 			};
 
 			frame@f42d000 {
 				reg = <0x0f42d000 0x1000>;
 				frame-number = <6>;
-				interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH 0>;
+				interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
 				status = "disabled";
 			};
 		};
@@ -2248,22 +2248,22 @@
 			compatible = "qcom,shikra-gpi-dma", "qcom,sm6350-gpi-dma";
 			reg = <0x0 0x04a00000 0x0 0x60000>;
 
-			interrupts = <GIC_SPI 511 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 512 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 513 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 514 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 515 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 516 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 517 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 518 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 519 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 520 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 521 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 522 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 523 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 524 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 525 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 526 IRQ_TYPE_LEVEL_HIGH 0>;
+			interrupts = <GIC_SPI 511 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 512 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 513 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 514 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 515 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 516 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 517 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 518 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 519 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 520 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 521 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 522 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 523 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 524 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 525 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 526 IRQ_TYPE_LEVEL_HIGH>;
 
 			dma-channels = <16>;
 			dma-channel-mask = <0xff>;
@@ -2304,7 +2304,7 @@
 				compatible = "qcom,geni-i2c";
 				reg = <0x0 0x4a80000 0x0 0x4000>;
 
-				interrupts = <GIC_SPI 527 IRQ_TYPE_LEVEL_HIGH 0>;
+				interrupts = <GIC_SPI 527 IRQ_TYPE_LEVEL_HIGH>;
 
 				clocks = <&gcc GCC_QUPV3_WRAP0_S0_CLK>;
 				clock-names = "se";
@@ -2336,7 +2336,7 @@
 				compatible = "qcom,geni-spi";
 				reg = <0x0 0x4a80000 0x0 0x4000>;
 
-				interrupts = <GIC_SPI 527 IRQ_TYPE_LEVEL_HIGH 0>;
+				interrupts = <GIC_SPI 527 IRQ_TYPE_LEVEL_HIGH>;
 
 				clocks = <&gcc GCC_QUPV3_WRAP0_S0_CLK>;
 				clock-names = "se";
@@ -2365,7 +2365,7 @@
 				compatible = "qcom,geni-debug-uart";
 				reg = <0x0 0x04a80000 0x0 0x4000>;
 
-				interrupts = <GIC_SPI 527 IRQ_TYPE_LEVEL_HIGH 0>;
+				interrupts = <GIC_SPI 527 IRQ_TYPE_LEVEL_HIGH>;
 
 				clocks = <&gcc GCC_QUPV3_WRAP0_S0_CLK>;
 				clock-names = "se";
@@ -2387,7 +2387,7 @@
 				compatible = "qcom,geni-i2c";
 				reg = <0x0 0x4a84000 0x0 0x4000>;
 
-				interrupts = <GIC_SPI 528 IRQ_TYPE_LEVEL_HIGH 0>;
+				interrupts = <GIC_SPI 528 IRQ_TYPE_LEVEL_HIGH>;
 
 				clocks = <&gcc GCC_QUPV3_WRAP0_S1_CLK>;
 				clock-names = "se";
@@ -2419,7 +2419,7 @@
 				compatible = "qcom,geni-uart";
 				reg = <0x0 0x04a84000 0x0 0x4000>;
 
-				interrupts = <GIC_SPI 528 IRQ_TYPE_LEVEL_HIGH 0>;
+				interrupts = <GIC_SPI 528 IRQ_TYPE_LEVEL_HIGH>;
 
 				clocks = <&gcc GCC_QUPV3_WRAP0_S1_CLK>;
 				clock-names = "se";
@@ -2441,7 +2441,7 @@
 				compatible = "qcom,geni-i2c";
 				reg = <0x0 0x4a88000 0x0 0x4000>;
 
-				interrupts = <GIC_SPI 529 IRQ_TYPE_LEVEL_HIGH 0>;
+				interrupts = <GIC_SPI 529 IRQ_TYPE_LEVEL_HIGH>;
 
 				clocks = <&gcc GCC_QUPV3_WRAP0_S2_CLK>;
 				clock-names = "se";
@@ -2473,7 +2473,7 @@
 				compatible = "qcom,geni-spi";
 				reg = <0x0 0x4a88000 0x0 0x4000>;
 
-				interrupts = <GIC_SPI 529 IRQ_TYPE_LEVEL_HIGH 0>;
+				interrupts = <GIC_SPI 529 IRQ_TYPE_LEVEL_HIGH>;
 
 				clocks = <&gcc GCC_QUPV3_WRAP0_S2_CLK>;
 				clock-names = "se";
@@ -2502,7 +2502,7 @@
 				compatible = "qcom,geni-uart";
 				reg = <0x0 0x04a88000 0x0 0x4000>;
 
-				interrupts-extended = <&intc GIC_SPI 529 IRQ_TYPE_LEVEL_HIGH 0>,
+				interrupts-extended = <&intc GIC_SPI 529 IRQ_TYPE_LEVEL_HIGH>,
 						      <&tlmm 9 IRQ_TYPE_LEVEL_HIGH>;
 
 				clocks = <&gcc GCC_QUPV3_WRAP0_S2_CLK>;
@@ -2525,7 +2525,7 @@
 				compatible = "qcom,geni-i2c";
 				reg = <0x0 0x4a8c000 0x0 0x4000>;
 
-				interrupts = <GIC_SPI 530 IRQ_TYPE_LEVEL_HIGH 0>;
+				interrupts = <GIC_SPI 530 IRQ_TYPE_LEVEL_HIGH>;
 
 				clocks = <&gcc GCC_QUPV3_WRAP0_S3_CLK>;
 				clock-names = "se";
@@ -2557,7 +2557,7 @@
 				compatible = "qcom,geni-uart";
 				reg = <0x0 0x04a8c000 0x0 0x4000>;
 
-				interrupts = <GIC_SPI 530 IRQ_TYPE_LEVEL_HIGH 0>;
+				interrupts = <GIC_SPI 530 IRQ_TYPE_LEVEL_HIGH>;
 
 				clocks = <&gcc GCC_QUPV3_WRAP0_S3_CLK>;
 				clock-names = "se";
@@ -2579,7 +2579,7 @@
 				compatible = "qcom,geni-i2c";
 				reg = <0x0 0x4a90000 0x0 0x4000>;
 
-				interrupts = <GIC_SPI 531 IRQ_TYPE_LEVEL_HIGH 0>;
+				interrupts = <GIC_SPI 531 IRQ_TYPE_LEVEL_HIGH>;
 
 				clocks = <&gcc GCC_QUPV3_WRAP0_S4_CLK>;
 				clock-names = "se";
@@ -2611,7 +2611,7 @@
 				compatible = "qcom,geni-uart";
 				reg = <0x0 0x04a90000 0x0 0x4000>;
 
-				interrupts = <GIC_SPI 531 IRQ_TYPE_LEVEL_HIGH 0>;
+				interrupts = <GIC_SPI 531 IRQ_TYPE_LEVEL_HIGH>;
 
 				clocks = <&gcc GCC_QUPV3_WRAP0_S4_CLK>;
 				clock-names = "se";
@@ -2633,7 +2633,7 @@
 				compatible = "qcom,geni-i2c";
 				reg = <0x0 0x4a94000 0x0 0x4000>;
 
-				interrupts = <GIC_SPI 532 IRQ_TYPE_LEVEL_HIGH 0>;
+				interrupts = <GIC_SPI 532 IRQ_TYPE_LEVEL_HIGH>;
 
 				clocks = <&gcc GCC_QUPV3_WRAP0_S5_CLK>;
 				clock-names = "se";
@@ -2665,7 +2665,7 @@
 				compatible = "qcom,geni-spi";
 				reg = <0x0 0x4a94000 0x0 0x4000>;
 
-				interrupts = <GIC_SPI 532 IRQ_TYPE_LEVEL_HIGH 0>;
+				interrupts = <GIC_SPI 532 IRQ_TYPE_LEVEL_HIGH>;
 
 				clocks = <&gcc GCC_QUPV3_WRAP0_S5_CLK>;
 				clock-names = "se";
@@ -2694,7 +2694,7 @@
 				compatible = "qcom,geni-uart";
 				reg = <0x0 0x04a94000 0x0 0x4000>;
 
-				interrupts = <GIC_SPI 532 IRQ_TYPE_LEVEL_HIGH 0>;
+				interrupts = <GIC_SPI 532 IRQ_TYPE_LEVEL_HIGH>;
 
 				clocks = <&gcc GCC_QUPV3_WRAP0_S5_CLK>;
 				clock-names = "se";
@@ -2716,7 +2716,7 @@
 				compatible = "qcom,geni-i2c";
 				reg = <0x0 0x4a98000 0x0 0x4000>;
 
-				interrupts = <GIC_SPI 533 IRQ_TYPE_LEVEL_HIGH 0>;
+				interrupts = <GIC_SPI 533 IRQ_TYPE_LEVEL_HIGH>;
 
 				clocks = <&gcc GCC_QUPV3_WRAP0_S6_CLK>;
 				clock-names = "se";
@@ -2748,7 +2748,7 @@
 				compatible = "qcom,geni-spi";
 				reg = <0x0 0x4a98000 0x0 0x4000>;
 
-				interrupts = <GIC_SPI 533 IRQ_TYPE_LEVEL_HIGH 0>;
+				interrupts = <GIC_SPI 533 IRQ_TYPE_LEVEL_HIGH>;
 
 				clocks = <&gcc GCC_QUPV3_WRAP0_S6_CLK>;
 				clock-names = "se";
@@ -2777,7 +2777,7 @@
 				compatible = "qcom,geni-uart";
 				reg = <0x0 0x04a98000 0x0 0x4000>;
 
-				interrupts = <GIC_SPI 533 IRQ_TYPE_LEVEL_HIGH 0>;
+				interrupts = <GIC_SPI 533 IRQ_TYPE_LEVEL_HIGH>;
 
 				clocks = <&gcc GCC_QUPV3_WRAP0_S6_CLK>;
 				clock-names = "se";
@@ -2799,7 +2799,7 @@
 				compatible = "qcom,geni-i2c";
 				reg = <0x0 0x4a9c000 0x0 0x4000>;
 
-				interrupts = <GIC_SPI 534 IRQ_TYPE_LEVEL_HIGH 0>;
+				interrupts = <GIC_SPI 534 IRQ_TYPE_LEVEL_HIGH>;
 
 				clocks = <&gcc GCC_QUPV3_WRAP0_S7_CLK>;
 				clock-names = "se";
@@ -2831,7 +2831,7 @@
 				compatible = "qcom,geni-uart";
 				reg = <0x0 0x04a9c000 0x0 0x4000>;
 
-				interrupts = <GIC_SPI 534 IRQ_TYPE_LEVEL_HIGH 0>;
+				interrupts = <GIC_SPI 534 IRQ_TYPE_LEVEL_HIGH>;
 
 				clocks = <&gcc GCC_QUPV3_WRAP0_S7_CLK>;
 				clock-names = "se";
@@ -2853,7 +2853,7 @@
 				compatible = "qcom,geni-i2c";
 				reg = <0x0 0x4aa0000 0x0 0x4000>;
 
-				interrupts = <GIC_SPI 535 IRQ_TYPE_LEVEL_HIGH 0>;
+				interrupts = <GIC_SPI 535 IRQ_TYPE_LEVEL_HIGH>;
 
 				clocks = <&gcc GCC_QUPV3_WRAP0_S8_CLK>;
 				clock-names = "se";
@@ -2885,7 +2885,7 @@
 				compatible = "qcom,geni-spi";
 				reg = <0x0 0x4aa0000 0x0 0x4000>;
 
-				interrupts = <GIC_SPI 535 IRQ_TYPE_LEVEL_HIGH 0>;
+				interrupts = <GIC_SPI 535 IRQ_TYPE_LEVEL_HIGH>;
 
 				clocks = <&gcc GCC_QUPV3_WRAP0_S8_CLK>;
 				clock-names = "se";
@@ -2914,7 +2914,7 @@
 				compatible = "qcom,geni-uart";
 				reg = <0x0 0x04aa0000 0x0 0x4000>;
 
-				interrupts = <GIC_SPI 535 IRQ_TYPE_LEVEL_HIGH 0>;
+				interrupts = <GIC_SPI 535 IRQ_TYPE_LEVEL_HIGH>;
 
 				clocks = <&gcc GCC_QUPV3_WRAP0_S8_CLK>;
 				clock-names = "se";
@@ -2936,7 +2936,7 @@
 				compatible = "qcom,geni-i2c";
 				reg = <0x0 0x4aa4000 0x0 0x4000>;
 
-				interrupts = <GIC_SPI 536 IRQ_TYPE_LEVEL_HIGH 0>;
+				interrupts = <GIC_SPI 536 IRQ_TYPE_LEVEL_HIGH>;
 
 				clocks = <&gcc GCC_QUPV3_WRAP0_S9_CLK>;
 				clock-names = "se";
@@ -2968,7 +2968,7 @@
 				compatible = "qcom,geni-uart";
 				reg = <0x0 0x04aa4000 0x0 0x4000>;
 
-				interrupts = <GIC_SPI 536 IRQ_TYPE_LEVEL_HIGH 0>;
+				interrupts = <GIC_SPI 536 IRQ_TYPE_LEVEL_HIGH>;
 
 				clocks = <&gcc GCC_QUPV3_WRAP0_S9_CLK>;
 				clock-names = "se";
@@ -2990,7 +2990,7 @@
 		bam_dmux_dma: dma-controller@6044000 {
 			compatible = "qcom,bam-v1.7.0";
 			reg = <0x0 0x06044000 0x0 0x19000>;
-			interrupts = <GIC_SPI 74 IRQ_TYPE_EDGE_RISING 0>;
+			interrupts = <GIC_SPI 74 IRQ_TYPE_EDGE_RISING>;
 			#dma-cells = <1>;
 			qcom,ee = <0>;
 
@@ -3003,7 +3003,7 @@
 			compatible = "qcom,shikra-mpss-pas";
 			reg = <0x0 0x06080000 0x0 0x100>;
 
-			interrupts-extended = <&intc GIC_SPI 307 IRQ_TYPE_EDGE_RISING 0>,
+			interrupts-extended = <&intc GIC_SPI 307 IRQ_TYPE_EDGE_RISING>,
 					      <&modem_smp2p_in 0 IRQ_TYPE_EDGE_RISING>,
 					      <&modem_smp2p_in 1 IRQ_TYPE_EDGE_RISING>,
 					      <&modem_smp2p_in 2 IRQ_TYPE_EDGE_RISING>,
@@ -3034,7 +3034,7 @@
 			status = "disabled";
 
 			glink-edge {
-				interrupts = <GIC_SPI 68 IRQ_TYPE_EDGE_RISING 0>;
+				interrupts = <GIC_SPI 68 IRQ_TYPE_EDGE_RISING>;
 				mboxes = <&apcs_glb 12>;
 				qcom,remote-pid = <1>;
 				label = "mpss";
@@ -4300,7 +4300,7 @@
 			compatible = "qcom,shikra-cdsp-pas";
 			reg = <0x0 0x0b300000 0x0 0x100000>;
 
-			interrupts-extended = <&intc GIC_SPI 265 IRQ_TYPE_EDGE_RISING 0>,
+			interrupts-extended = <&intc GIC_SPI 265 IRQ_TYPE_EDGE_RISING>,
 					      <&cdsp_smp2p_in 0 IRQ_TYPE_EDGE_RISING>,
 					      <&cdsp_smp2p_in 1 IRQ_TYPE_EDGE_RISING>,
 					      <&cdsp_smp2p_in 2 IRQ_TYPE_EDGE_RISING>,
@@ -4331,7 +4331,7 @@
 			status = "disabled";
 
 			glink-edge {
-				interrupts = <GIC_SPI 261 IRQ_TYPE_EDGE_RISING 0>;
+				interrupts = <GIC_SPI 261 IRQ_TYPE_EDGE_RISING>;
 				mboxes = <&apcs_glb 4>;
 				qcom,remote-pid = <5>;
 				label = "cdsp";
@@ -4392,7 +4392,7 @@
 			compatible = "qcom,shikra-lpaicp-pas";
 			reg = <0x0 0x0b800000 0x0 0x200000>;
 
-			interrupts-extended = <&intc GIC_SPI 257 IRQ_TYPE_EDGE_RISING 0>,
+			interrupts-extended = <&intc GIC_SPI 257 IRQ_TYPE_EDGE_RISING>,
 					      <&lmcu_smp2p_in 0 IRQ_TYPE_NONE>,
 					      <&lmcu_smp2p_in 1 IRQ_TYPE_NONE>,
 					      <&lmcu_smp2p_in 2 IRQ_TYPE_NONE>,
@@ -4415,7 +4415,7 @@
 			status = "disabled";
 
 			glink-edge {
-				interrupts = <GIC_SPI 286 IRQ_TYPE_EDGE_RISING 0>;
+				interrupts = <GIC_SPI 286 IRQ_TYPE_EDGE_RISING>;
 				mboxes = <&apcs_glb 9>;
 				qcom,remote-pid = <26>;
 				label = "lpaicp";
@@ -4440,8 +4440,8 @@
 			clocks = <&rpmcc RPM_SMD_XO_CLK_SRC>, <&gcc GPLL0>;
 			clock-names = "xo", "alternate";
 
-			interrupts = <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH 0>,
-				     <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH 0>;
+			interrupts = <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
 			interrupt-names = "dcvsh-irq-0",
 					  "dcvsh-irq-1";
 
@@ -4736,9 +4736,9 @@
 	timer {
 		compatible = "arm,armv8-timer";
 
-		interrupts = <GIC_PPI 1 IRQ_TYPE_LEVEL_LOW 0>,
-			     <GIC_PPI 2 IRQ_TYPE_LEVEL_LOW 0>,
-			     <GIC_PPI 3 IRQ_TYPE_LEVEL_LOW 0>,
-			     <GIC_PPI 0 IRQ_TYPE_LEVEL_LOW 0>;
+		interrupts = <GIC_PPI 1 IRQ_TYPE_LEVEL_LOW>,
+			     <GIC_PPI 2 IRQ_TYPE_LEVEL_LOW>,
+			     <GIC_PPI 3 IRQ_TYPE_LEVEL_LOW>,
+			     <GIC_PPI 0 IRQ_TYPE_LEVEL_LOW>;
 	};
 };
