@@ -203,7 +203,7 @@ jobs:
       #    fetch-source-pkg.yml; they are not the main branch.
       # -----------------------------------------------------------------------
       - name: Checkout kernel source
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7.0.1
         with:
           ref: ${{ inputs.ref != '' && inputs.ref || (inputs.kernel_version != '' && format('{0}-{1}', env.UPSTREAM_PREFIX, inputs.kernel_version) || inputs.suite || 'resolute-qcom-devel') }}
           path: kernel-src
@@ -296,7 +296,7 @@ jobs:
       #     caller's resolute-qcom-devel merge commit, not main.
       # -----------------------------------------------------------------------
       - name: Checkout CI scripts
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7.0.1
         with:
           ref: main
           # Own path, matching kernel-src and docker-pkg-build: checking out
@@ -323,7 +323,7 @@ jobs:
       # 5. Checkout docker-pkg-build
       # -----------------------------------------------------------------------
       - name: Checkout docker-pkg-build
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7.0.1
         with:
           repository: qualcomm-linux/docker-pkg-build
           ref: main
