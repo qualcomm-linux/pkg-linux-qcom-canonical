@@ -371,7 +371,7 @@ jobs:
           # expand $(...) or ${VAR} before passing the string to docker.
           # JOBS, TARGET, and WS are passed as -e env vars and expanded inside
           # the container by the container's own bash.
-          docker run -i --privileged --rm \
+          docker run -i --rm \
             -v "${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE}" \
             --workdir="${GITHUB_WORKSPACE}" \
             -e JOBS="${JOBS}" \
