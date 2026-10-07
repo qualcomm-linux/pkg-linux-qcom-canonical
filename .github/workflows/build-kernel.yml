@@ -312,12 +312,17 @@ jobs:
           sudo apt-get install -y --no-install-recommends gh jq dpkg-dev
 
       - name: Apply Qualcomm local version suffix
+        id: version-suffix
         env:
           KERNEL_VERSION: ${{ inputs.kernel_version }}
           GH_TOKEN: ${{ github.token }}
         run: |
-          bash ./ci-scripts/scripts/apply-local-version-suffix.sh || \
-            echo "::warning::Local version suffix step failed; proceeding without it."
+          if bash ./ci-scripts/scripts/apply-local-version-suffix.sh; then
+            echo "applied=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "applied=false" >> "$GITHUB_OUTPUT"
+            echo "::error::Local version suffix step failed, so this build carries the released version of the tag it sits on. Packages will not be uploaded."
+          fi
 
       # -----------------------------------------------------------------------
       # 5. Checkout docker-pkg-build
@@ -504,7 +509,7 @@ jobs:
       #    caller's original event, so it is never actually "workflow_call".
       # -----------------------------------------------------------------------
       - name: Upload kernel .deb packages to S3
-        if: inputs.skip_s3 != true
+        if: inputs.skip_s3 != true && steps.version-suffix.outputs.applied != 'false'
         uses: qualcomm-linux/upload-private-artifact-action@4940e9327cd7386acdb908b61c714c079b7d754b # aws-v4
         with:
           s3_bucket: qli-prd-lecore-gh-artifacts
