@@ -357,25 +357,27 @@ jobs:
           # linux-headers-* and linux-tools-* packages depend on it, so it
           # can't be made optional here.
           if [ "${FLAVOURS_LC}" = "all" ]; then
-            TARGET="binary"
+            RULES_TARGETS="binary"
           else
-            TARGET="binary-indep"
+            RULES_TARGETS="binary-indep"
             for f in ${FLAVOURS_LC}; do
-              TARGET="${TARGET} binary-${f}"
+              RULES_TARGETS="${RULES_TARGETS} binary-${f}"
             done
           fi
 
-          echo "Building: suite=${SUITE}  base_suite=${BASE_SUITE}  target=${TARGET}  arch=${ARCH}  jobs=${JOBS}"
+          echo "Building: suite=${SUITE}  base_suite=${BASE_SUITE}  target=${RULES_TARGETS}  arch=${ARCH}  jobs=${JOBS}"
 
           # IMPORTANT: use single quotes for bash -c so the outer shell does NOT
           # expand $(...) or ${VAR} before passing the string to docker.
-          # JOBS, TARGET, and WS are passed as -e env vars and expanded inside
-          # the container by the container's own bash.
+          # JOBS, RULES_TARGETS, and WS are passed as -e env vars and expanded
+          # inside the container by the container's own bash. The targets are
+          # deliberately not named TARGET: bindgen reads TARGET as a Cargo
+          # target triple and passes it to clang, which disables Rust support.
           docker run -i --rm \
             -v "${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE}" \
             --workdir="${GITHUB_WORKSPACE}" \
             -e JOBS="${JOBS}" \
-            -e TARGET="${TARGET}" \
+            -e RULES_TARGETS="${RULES_TARGETS}" \
             -e WS="${GITHUB_WORKSPACE}" \
             -e DBGSYM="${DBGSYM}" \
             "ghcr.io/qualcomm-linux/pkg-builder:${BASE_SUITE}" \
@@ -431,7 +433,7 @@ jobs:
               echo "=== Installing build dependencies from debian/control ==="
               apt-get build-dep -y ./
 
-              echo "=== Starting: fakeroot debian/rules ${TARGET} (jobs=${JOBS}) ==="
+              echo "=== Starting: fakeroot debian/rules ${RULES_TARGETS} (jobs=${JOBS}) ==="
               export DEB_BUILD_OPTIONS="parallel=${JOBS} nocheck"
               # do_skip_checks=true skips the config policy check that requires
               # CONFIG_RUST_IS_AVAILABLE=y — bindgen-0.65 is not available in
@@ -441,7 +443,7 @@ jobs:
               # -dbgsym.ddeb (vmlinux + modules with full debug symbols).
               DBGSYM_OPT="do_dbgsym_package=false"
               if [ "${DBGSYM}" = "true" ]; then DBGSYM_OPT="do_dbgsym_package=true"; fi
-              fakeroot debian/rules ${TARGET} do_skip_checks=true "${DBGSYM_OPT}"
+              fakeroot debian/rules ${RULES_TARGETS} do_skip_checks=true "${DBGSYM_OPT}"
 
               kill "${HEARTBEAT}" 2>/dev/null || true
 
