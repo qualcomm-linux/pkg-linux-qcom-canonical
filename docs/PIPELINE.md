@@ -13,6 +13,7 @@ ubuntu-qcom-kernel
 │   │   ├── fetch-source-pkg.yml      ← manual incremental mirror sync
 │   │   ├── bootstrap-history.yml     ← one-time history seed
 │   │   ├── build-kernel.yml          ← build .deb packages (+ reusable workflow_call)
+│   │   ├── premerge-main.yml         ← pre-merge build check for PRs to main
 │   │   └── premerge-distro-validation.yml ← trusted distro image validation orchestrator
 │   ├── scripts/                      ← sync-mirror.sh, seed-history.sh (self-documenting)
 │   └── README.md
@@ -64,6 +65,11 @@ that branch), which calls `build-kernel.yml` with `flavours=qcom`,
 regardless of `flavours`). Its packages are uploaded to S3 under
 `pkg/premerge/`, separate from the `pkg/temp/` prefix used by nightly and
 manual `workflow_dispatch` runs.
+
+PRs into `main` that change `.github/workflows/` or `scripts/` get their own
+build check (`premerge-main.yml`). It builds `resolute-qcom-devel` with the
+PR's `build-kernel.yml` and scripts, using `flavours=qcom` and `dbgsym=false`,
+and uploads nothing.
 
 After the pre-merge kernel workflow completes, `premerge-distro-validation.yml`
 runs from the trusted `main` branch through `workflow_run`. It resolves the PR

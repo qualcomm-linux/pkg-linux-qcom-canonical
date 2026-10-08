@@ -1,0 +1,52 @@
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+# SPDX-License-Identifier: BSD-3-Clause
+#
+# premerge-main.yml - pre-merge build check for pull requests to main.
+#
+# main holds the CI that every resolute-qcom-devel build runs: premerge-pr.yml
+# and the nightly both call build-kernel.yml@main. This builds
+# resolute-qcom-devel with the PR's own build-kernel.yml (called by local path)
+# and the PR's own scripts (ci_scripts_ref), so a CI change is exercised before
+# it can break every devel build. Build only: no S3 upload, no distro images.
+#
+# The name must not be "Pre-merge PR build": premerge-distro-validation.yml
+# triggers on workflow_run of that exact name and would dispatch a distro
+# image build for every pull request to main.
+#
+# Security: uses pull_request (NOT pull_request_target), so the run gets a
+# read-only token and no secrets. The same-repository condition below avoids
+# accidental fork runs, but it is not a security boundary: on pull_request the
+# PR supplies this file. "Require approval for all fork pull requests"
+# (Settings > Actions) remains what gates the self-hosted runner.
+
+name: "Pre-merge main build"
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
+    paths:
+      - ".github/workflows/**"
+      - "scripts/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: premerge-main-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: "Build check"
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    # Workspace-relative on purpose: this is a job-level call, resolved before
+    # any step runs, and actionlint does not yet parse the $/ form.
+    uses: ./.github/workflows/build-kernel.yml # zizmor: ignore[self-repository]
+    with:
+      suite: resolute-qcom-devel
+      ci_scripts_ref: refs/pull/${{ github.event.pull_request.number }}/merge
+      skip_s3: true
+      dbgsym: false
+      flavours: qcom
