@@ -203,7 +203,7 @@ jobs:
       #    fetch-source-pkg.yml; they are not the main branch.
       # -----------------------------------------------------------------------
       - name: Checkout kernel source
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           ref: ${{ inputs.ref != '' && inputs.ref || (inputs.kernel_version != '' && format('{0}-{1}', env.UPSTREAM_PREFIX, inputs.kernel_version) || inputs.suite || 'resolute-qcom-devel') }}
           path: kernel-src
@@ -296,7 +296,7 @@ jobs:
       #     caller's resolute-qcom-devel merge commit, not main.
       # -----------------------------------------------------------------------
       - name: Checkout CI scripts
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           ref: main
           # Own path, matching kernel-src and docker-pkg-build: checking out
@@ -323,7 +323,7 @@ jobs:
       # 5. Checkout docker-pkg-build
       # -----------------------------------------------------------------------
       - name: Checkout docker-pkg-build
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           repository: qualcomm-linux/docker-pkg-build
           ref: main
@@ -501,7 +501,7 @@ jobs:
       # -----------------------------------------------------------------------
       - name: Upload kernel .deb packages to S3
         if: inputs.skip_s3 != true
-        uses: qualcomm-linux/upload-private-artifact-action@aws-v4
+        uses: qualcomm-linux/upload-private-artifact-action@4940e9327cd7386acdb908b61c714c079b7d754b # aws-v4
         with:
           s3_bucket: qli-prd-lecore-gh-artifacts
           path: ${{ github.workspace }}/output

@@ -64,7 +64,7 @@ jobs:
       # 2. Check out this repo just for the scripts/ helpers.
       # -----------------------------------------------------------------------
       - name: Checkout CI scripts
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       # -----------------------------------------------------------------------
       # 3. Resolve the seed configuration (URL, tag prefix, seed branch).
@@ -106,7 +106,7 @@ jobs:
       #    skips re-downloading the multi-GB history).
       # -----------------------------------------------------------------------
       - name: Restore cached clone
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ${{ steps.cfg.outputs.cache_path }}
           key: history-seed-${{ steps.cfg.outputs.suite }}-${{ github.run_id }}
@@ -147,7 +147,7 @@ jobs:
       # -----------------------------------------------------------------------
       - name: Cache clone for retry
         if: steps.seed.outputs.status == 'failed'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ${{ steps.cfg.outputs.cache_path }}
           key: history-seed-${{ steps.cfg.outputs.suite }}-${{ github.run_id }}
