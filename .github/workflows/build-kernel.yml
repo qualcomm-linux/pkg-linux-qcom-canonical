@@ -93,6 +93,11 @@ on:
         required: false
         default: "temp"
         type: string
+      ci_scripts_ref:
+        description: "Ref to check out scripts/ from. Defaults to main; premerge-main.yml passes the PR merge ref so a PR's own scripts are what get tested."
+        required: false
+        default: "main"
+        type: string
 
 permissions:
   contents: read    # checkout + tag ls-remote only; output goes to S3
@@ -290,15 +295,17 @@ jobs:
       #     a plain rebuild of that tag. Skipped for resolute-qcom mirror and
       #     kernel_version-pinned builds. Never fails the kernel build itself.
       #
-      #     Checked out at main: CI scripts must come from the trusted
-      #     default branch, not whatever ref is being built. Matters most
-      #     for workflow_call from premerge-pr.yml, where github.sha is the
-      #     caller's resolute-qcom-devel merge commit, not main.
+      #     Checked out at main by default: CI scripts must come from the
+      #     trusted default branch, not whatever ref is being built. Matters
+      #     most for workflow_call from premerge-pr.yml, where github.sha is
+      #     the caller's resolute-qcom-devel merge commit, not main. The one
+      #     caller that overrides it is premerge-main.yml, whose pull requests
+      #     change the scripts themselves.
       # -----------------------------------------------------------------------
       - name: Checkout CI scripts
         uses: actions/checkout@v6
         with:
-          ref: main
+          ref: ${{ inputs.ci_scripts_ref || 'main' }}
           # Own path, matching kernel-src and docker-pkg-build: checking out
           # to the workspace root would clean the whole workspace, deleting
           # kernel-src.
