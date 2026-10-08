@@ -52,7 +52,7 @@ docker run -i --rm \
     fakeroot make -f debian/rules clean
     apt-get build-dep -y ./
     export DEB_BUILD_OPTIONS="parallel=${JOBS} nocheck"
-    fakeroot debian/rules binary-indep binary-qcom do_skip_checks=true
+    fakeroot debian/rules binary-indep binary-qcom
   '
 ```
 

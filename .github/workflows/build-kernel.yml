@@ -435,15 +435,14 @@ jobs:
 
               echo "=== Starting: fakeroot debian/rules ${RULES_TARGETS} (jobs=${JOBS}) ==="
               export DEB_BUILD_OPTIONS="parallel=${JOBS} nocheck"
-              # do_skip_checks=true skips the config policy check that requires
-              # CONFIG_RUST_IS_AVAILABLE=y — bindgen-0.65 is not available in
-              # the container so Rust support is unavailable, causing the check
-              # to fail. This is the standard approach for non-official builds.
+              # The config policy and module signature checks run as in the
+              # official Canonical builds, so a config that does not match the
+              # annotations fails here rather than shipping.
               # do_dbgsym_package=true additionally builds the unstripped
               # -dbgsym.ddeb (vmlinux + modules with full debug symbols).
               DBGSYM_OPT="do_dbgsym_package=false"
               if [ "${DBGSYM}" = "true" ]; then DBGSYM_OPT="do_dbgsym_package=true"; fi
-              fakeroot debian/rules ${RULES_TARGETS} do_skip_checks=true "${DBGSYM_OPT}"
+              fakeroot debian/rules ${RULES_TARGETS} "${DBGSYM_OPT}"
 
               kill "${HEARTBEAT}" 2>/dev/null || true
 
