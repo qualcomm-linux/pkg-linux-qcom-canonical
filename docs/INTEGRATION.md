@@ -35,5 +35,8 @@ Commits must carry a DCO `Signed-off-by` line (`git commit -s`) as required for 
 
 ## Building
 
-To build `resolute-qcom-devel` (or any mirrored upload) into `.deb` packages, see
-[PIPELINE.md](PIPELINE.md#manual-build-triggers).
+To build `resolute-qcom-devel` (or any mirrored upload) locally, see
+[LOCAL-BUILD.md](LOCAL-BUILD.md).
+
+To run the build in CI instead, see
+[PIPELINE.md](PIPELINE.md#running-it).
