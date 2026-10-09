@@ -1,7 +1,8 @@
 # Building the kernel locally
 
 Builds `resolute-qcom-devel`, or any mirrored upload, into `.deb` packages
-the way [build-kernel.yml](../.github/workflows/build-kernel.yml) does.
+with the same container and steps as
+[build-kernel.yml](../.github/workflows/build-kernel.yml).
 
 For triggering a build in CI, see [PIPELINE.md](PIPELINE.md#running-it). For
 working on contributions, see [INTEGRATION.md](INTEGRATION.md).
@@ -61,6 +62,10 @@ Collect the output. It lands beside `kernel-src`, not inside it:
 ```bash
 ls -lh *.deb
 ```
+
+These packages carry the plain `debian.qcom/changelog` version. CI appends
+`+qcom<N>.<sha>` when the branch has commits past a Canonical tag; a local
+build does not, so its version matches the Canonical upload it is based on.
 
 ## Targets
 
