@@ -15,10 +15,13 @@
 # doesn't fetch tags, and this repo's full tag namespace is too large to
 # fetch blindly on every build.
 #
-# Never fails the build itself. Writes a full replacement changelog to a
-# temp file and swaps it in with mv at the end, so a failure partway
-# through never leaves debian/changelog partially written; the calling
-# workflow step also downgrades any non-zero exit to a warning.
+# Exits 0 when no suffix is needed (not a resolute-qcom-devel build, or HEAD
+# is exactly a sync tag) and 1 when a resolute-qcom-devel build cannot be
+# versioned, so the calling workflow can withhold its packages rather than
+# publish them under the released version of the tag they sit on. Writes a
+# full replacement changelog to a temp file and swaps it in with mv at the
+# end, so a failure partway through never leaves debian/changelog partially
+# written.
 set -euo pipefail
 
 : "${SUITE:?SUITE is required}"
@@ -27,6 +30,12 @@ KERNEL_VERSION="${KERNEL_VERSION:-}"
 
 emit_kernel_version() {
   echo "KERNEL_LOCAL_VERSION=$1" >> "$GITHUB_ENV"
+}
+
+fail() {
+  echo "::error::$1"
+  emit_kernel_version "unmodified"
+  exit 1
 }
 
 if [[ "$SUITE" != "resolute-qcom-devel" || -n "$KERNEL_VERSION" ]]; then
@@ -45,34 +54,26 @@ for tool in gh jq dpkg-parsechangelog; do
   command -v "$tool" >/dev/null 2>&1 || MISSING_TOOLS+=("$tool")
 done
 if (( ${#MISSING_TOOLS[@]} > 0 )); then
-  echo "::warning::Missing required tool(s) on the runner: ${MISSING_TOOLS[*]}; skipping local version suffix."
-  emit_kernel_version "unmodified"
-  exit 0
+  fail "Missing required tool(s) on the runner: ${MISSING_TOOLS[*]}; cannot apply the local version suffix."
 fi
 
 cd kernel-src/
 
 DEBIAN_DIR="$(awk -F= '($1 == "DEBIAN") { print $2 }' debian/debian.env 2>/dev/null || true)"
 if [[ -z "$DEBIAN_DIR" ]]; then
-  echo "::warning::Could not resolve DEBIAN directory from debian/debian.env; skipping local version suffix."
-  emit_kernel_version "unmodified"
-  exit 0
+  fail "Could not resolve DEBIAN directory from debian/debian.env; cannot apply the local version suffix."
 fi
 
 CHANGELOG="${DEBIAN_DIR}/changelog"
 if [[ ! -f "$CHANGELOG" ]]; then
-  echo "::warning::${CHANGELOG} not found; skipping local version suffix."
-  emit_kernel_version "unmodified"
-  exit 0
+  fail "${CHANGELOG} not found; cannot apply the local version suffix."
 fi
 
 HEAD_SHA="$(git rev-parse HEAD)"
 SHORT_SHA="$(git rev-parse --short=12 HEAD)"
 
 if [[ ! "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]] || [[ ! "$SHORT_SHA" =~ ^[0-9a-f]{12}$ ]]; then
-  echo "::warning::Unexpected HEAD SHA format; skipping local version suffix."
-  emit_kernel_version "unmodified"
-  exit 0
+  fail "Unexpected HEAD SHA format; cannot apply the local version suffix."
 fi
 
 if ! TAGS_RAW="$(
@@ -81,16 +82,12 @@ if ! TAGS_RAW="$(
     --jq '[.[] | select(.name | test("^Ubuntu-qcom-[0-9]+\\.[0-9]+\\.[0-9]+-[0-9]+\\.[0-9]+$")) | .name]' \
     2>&1
 )"; then
-  echo "::warning::Unable to list Ubuntu-qcom-* tags; skipping local version suffix. ${TAGS_RAW}"
-  emit_kernel_version "unmodified"
-  exit 0
+  fail "Unable to list Ubuntu-qcom-* tags; cannot apply the local version suffix. ${TAGS_RAW}"
 fi
 
 TAGS_JSON="$(jq -s 'add // []' <<< "$TAGS_RAW")"
 if [[ "$(jq 'length' <<< "$TAGS_JSON")" == "0" ]]; then
-  echo "::warning::No Ubuntu-qcom-* tags returned; skipping local version suffix."
-  emit_kernel_version "unmodified"
-  exit 0
+  fail "No Ubuntu-qcom-* tags returned; cannot apply the local version suffix."
 fi
 
 # Find the tag with the smallest ahead_by among all tags that are actual
@@ -116,9 +113,7 @@ for tag in $(jq -r '.[]' <<< "$TAGS_JSON"); do
 done
 
 if [[ -z "$BEST_AHEAD" ]]; then
-  echo "::warning::No Ubuntu-qcom-* tag found as an ancestor of ${HEAD_SHA}; skipping local version suffix. ${LAST_COMPARE_ERROR}"
-  emit_kernel_version "unmodified"
-  exit 0
+  fail "No Ubuntu-qcom-* tag found as an ancestor of ${HEAD_SHA}; cannot apply the local version suffix. ${LAST_COMPARE_ERROR}"
 fi
 
 if [[ "$BEST_AHEAD" == "0" ]]; then
