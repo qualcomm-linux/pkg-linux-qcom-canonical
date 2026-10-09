@@ -312,12 +312,17 @@ jobs:
           sudo apt-get install -y --no-install-recommends gh jq dpkg-dev
 
       - name: Apply Qualcomm local version suffix
+        id: version-suffix
         env:
           KERNEL_VERSION: ${{ inputs.kernel_version }}
           GH_TOKEN: ${{ github.token }}
         run: |
-          bash ./ci-scripts/scripts/apply-local-version-suffix.sh || \
-            echo "::warning::Local version suffix step failed; proceeding without it."
+          if bash ./ci-scripts/scripts/apply-local-version-suffix.sh; then
+            echo "applied=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "applied=false" >> "$GITHUB_OUTPUT"
+            echo "::error::Local version suffix step failed, so this build carries the released version of the tag it sits on. Packages will not be uploaded."
+          fi
 
       # -----------------------------------------------------------------------
       # 5. Checkout docker-pkg-build
@@ -381,9 +386,13 @@ jobs:
               # pkg-builder:noble is Ubuntu 24.04 which uses DEB822 format.
               sed -i "s/^Types: deb$/Types: deb deb-src/" /etc/apt/sources.list.d/ubuntu.sources
 
-              # Add Qualcomm qartifactory repo for kgsl-dkms
-              echo "deb [trusted=yes] https://qartifactory-edge.qualcomm.com/artifactory/qsc-deb-releases resolute main" \
-                > /etc/apt/sources.list.d/qsc-deb-releases.list
+              # The Qualcomm repository supplies the DKMS module sources. The
+              # image ships both the signing key and a suite-matched sources
+              # file for it, so install those rather than restating the
+              # repository here with trusted=yes.
+              install -D -m644 /tmp/keyrings/qsc-deb-releases.asc \
+                /etc/apt/keyrings/qsc-deb-releases.asc
+              cp /tmp/qsc-deb-releases.sources /etc/apt/sources.list.d/
 
               apt-get update -qq
 
@@ -500,7 +509,7 @@ jobs:
       #    caller's original event, so it is never actually "workflow_call".
       # -----------------------------------------------------------------------
       - name: Upload kernel .deb packages to S3
-        if: inputs.skip_s3 != true
+        if: inputs.skip_s3 != true && steps.version-suffix.outputs.applied != 'false'
         uses: qualcomm-linux/upload-private-artifact-action@4940e9327cd7386acdb908b61c714c079b7d754b # aws-v4
         with:
           s3_bucket: qli-prd-lecore-gh-artifacts
