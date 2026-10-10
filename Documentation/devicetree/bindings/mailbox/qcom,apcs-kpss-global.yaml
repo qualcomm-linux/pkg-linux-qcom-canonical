@@ -65,7 +65,6 @@ properties:
           - qcom,ipq6018-apcs-apps-global
           - qcom,msm8996-apcs-hmss-global
           - qcom,qcm2290-apcs-hmss-global
-          - qcom,shikra-apcs-hmss-global
           - qcom,sdm845-apss-shared
 
   reg:
@@ -239,7 +238,6 @@ allOf:
               - qcom,msm8994-apcs-kpss-global
               - qcom,msm8996-apcs-hmss-global
               - qcom,qcm2290-apcs-hmss-global
-              - qcom,shikra-apcs-hmss-global
               - qcom,sdm845-apss-shared
     then:
       properties:

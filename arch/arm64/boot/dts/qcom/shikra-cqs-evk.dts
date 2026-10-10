@@ -5,7 +5,7 @@
 
 /dts-v1/;
 
-#include "shikra-cqs-som.dtsi"
+#include "shikra-cqm-som.dtsi"
 #include "shikra-evk.dtsi"
 #include <dt-bindings/gpio/gpio.h>
 
@@ -18,7 +18,6 @@
 		mmc0 = &sdhc_1;
 		mmc1 = &sdhc_2; /* SDC2 SD card slot */
 		serial0 = &uart0;
-		serial1 = &uart8;
 	};
 
 	chosen {
@@ -28,58 +27,100 @@
 	lcd_bias: regulator-lcd-bias {
 		compatible = "regulator-fixed";
 		regulator-name = "lcd_bias";
-		regulator-min-microvolt = <3300000>;
-		regulator-max-microvolt = <3300000>;
-		vin-supply = <&pm4125_l17>;
 		gpio = <&tlmm 151 GPIO_ACTIVE_HIGH>;
 		enable-active-high;
 		pinctrl-0 = <&lcd_bias_en>;
 		pinctrl-names = "default";
 	};
 
-	wcn3988-pmu {
-		compatible = "qcom,wcn3988-pmu";
-
-		pinctrl-0 = <&sw_ctrl_default>;
+	rgmii_phy_supply: regulator-rgmii-phy {
+		compatible = "regulator-fixed";
+		regulator-name = "rgmii-phy-pwr";
+		regulator-min-microvolt = <2500000>;
+		regulator-max-microvolt = <2500000>;
+		gpio = <&tlmm 149 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+		pinctrl-0 = <&rgmii_phy_pwr_default>;
 		pinctrl-names = "default";
+	};
 
-		vddio-supply = <&pm4125_l7>;
-		vddxo-supply = <&pm4125_l13>;
-		vddrf-supply = <&pm4125_l10>;
-		vddch0-supply = <&pm4125_l22>;
+	vreg_disp_n: regulator-vreg-disp-n {
+		compatible = "regulator-fixed";
+		regulator-name = "vreg_disp_n";
+		regulator-min-microvolt = <5500000>;
+		regulator-max-microvolt = <5500000>;
+		vin-supply = <&lcd_bias>;
+	};
 
-		swctrl-gpios = <&tlmm 88 GPIO_ACTIVE_HIGH>;
+	vreg_disp_p: regulator-vreg-disp-p {
+		compatible = "regulator-fixed";
+		regulator-name = "vreg_disp_p";
+		regulator-min-microvolt = <5500000>;
+		regulator-max-microvolt = <5500000>;
+		vin-supply = <&lcd_bias>;
+	};
+};
 
-		regulators {
-			vreg_pmu_io: ldo0 {
-				regulator-name = "vreg_pmu_io";
-			};
+&ethernet0 {
+	phy-handle = <&rgmii_phy>;
+	phy-mode = "rgmii-id";
 
-			vreg_pmu_xo: ldo1 {
-				regulator-name = "vreg_pmu_xo";
-			};
+	pinctrl-0 = <&ethernet0_default>;
+	pinctrl-names = "default";
 
-			vreg_pmu_rf: ldo2 {
-				regulator-name = "vreg_pmu_rf";
-			};
+	status = "okay";
 
-			vreg_pmu_ch0: ldo3 {
-				regulator-name = "vreg_pmu_ch0";
-			};
+	mdio {
+		compatible = "snps,dwmac-mdio";
+		#address-cells = <1>;
+		#size-cells = <0>;
 
-			vreg_pmu_ch1: ldo4 {
-				regulator-name = "vreg_pmu_ch1";
-			};
+		rgmii_phy: ethernet-phy@7 {
+			compatible = "ethernet-phy-id2000.a231";
+			reg = <0x7>;
+			reset-gpios = <&tlmm 135 GPIO_ACTIVE_LOW>;
+			reset-assert-us = <10000>;
+			reset-deassert-us = <50000>;
+			vdda-2p5-supply = <&rgmii_phy_supply>;
 		};
 	};
 };
 
-&gpu {
+&i2c3 {
 	status = "okay";
-};
 
-&gpu_zap_shader {
-	firmware-name = "qcom/shikra/a704_zap.mbn";
+	typec@40 {
+                compatible = "cypress,cypd6129";
+                reg = <0x40>;
+                interrupts-extended = <&tlmm 136 IRQ_TYPE_LEVEL_LOW>;
+                pinctrl-0 = <&usb0_intr_state>;
+                pinctrl-names = "default";
+                wakeup-source;
+
+                #address-cells = <1>;
+                #size-cells = <0>;
+
+                ccg_typec_con0: connector@0 {
+                        compatible = "usb-c-connector";
+                        reg = <0>;
+                        label = "USB-C";
+                        data-role = "dual";
+                        power-role = "dual";
+
+                        ports {
+                                #address-cells = <1>;
+                                #size-cells = <0>;
+
+                                port@0 {
+                                        reg = <0>;
+
+                                        ucsi_ccg_port: endpoint {
+                                                remote-endpoint = <&usb_2_dwc3_hs>;
+                                        };
+                                };
+                        };
+                };
+        };
 };
 
 &mdss {
@@ -88,20 +129,21 @@
 
 &mdss_dsi0 {
 	vdda-supply = <&pm4125_l5>;
+
 	status = "okay";
 
 	panel@0 {
-		compatible = "dlc,dlc0697";
+		compatible = "dlc,dlc0697", "ilitek,ili7807s";
 		reg = <0>;
 
 		reset-gpios = <&tlmm 3 GPIO_ACTIVE_LOW>;
-		enable-gpios = <&tlmm 91 GPIO_ACTIVE_HIGH>;
 
-		vddio-supply = <&pm4125_l15>;
-		bias-supply = <&lcd_bias>;
+		vddi-supply = <&pm4125_l15>;
+		avdd-supply = <&vreg_disp_p>;
+		avee-supply = <&vreg_disp_n>;
 
-		pinctrl-0 = <&panel_rst_n &panel_te_pin>;
-		pinctrl-1 = <&panel_rst_n_suspend>;
+		pinctrl-0 = <&panel_rst_n &panel_te_pin &panel_bl_en>;
+		pinctrl-1 = <&panel_rst_n_suspend &panel_bl_en_suspend>;
 		pinctrl-names = "default", "sleep";
 
 		port {
@@ -121,15 +163,22 @@
 	status = "okay";
 };
 
-&pm4125_hs_in {
-	remote-endpoint = <&usb_1_dwc3_hs>;
-};
-
 &pm4125_l5 {
 	/* DSI VDDA - must be at NOM voltage for PHY PLL lock */
 	regulator-min-microvolt = <1232000>;
 	regulator-max-microvolt = <1232000>;
 	regulator-allow-set-load;
+};
+
+&pcie_phy {
+	vdda-phy-supply = <&pm4125_l13>;
+	vdda-pll-supply = <&pm4125_l9>;
+
+	status = "okay";
+};
+
+&pm4125_hs_in {
+	remote-endpoint = <&usb_1_dwc3_hs>;
 };
 
 &pm4125_ss_in {
@@ -150,9 +199,9 @@
 };
 
 &remoteproc_mpss {
-        firmware-name = "qcom/shikra/qdsp6sw.mbn";
+	firmware-name = "qcom/shikra/cqs/qdsp6sw.mbn";
 
-        status = "okay";
+	status = "okay";
 };
 
 &sdhc_1 {
@@ -175,28 +224,10 @@
 	vmmc-supply = <&pm4125_l21>;
 	vqmmc-supply = <&pm4125_l4>;
 
-	no-sdio;
-	no-mmc;
-
-	pinctrl-0 = <&sdc2_default &sdc2_card_det_n>;
-	pinctrl-1 = <&sdc2_sleep &sdc2_card_det_n>;
-	pinctrl-names = "default", "sleep";
-
-	cd-gpios = <&tlmm 89 GPIO_ACTIVE_LOW>;
-
 	status = "okay";
 };
 
 &tlmm {
-	gpio-reserved-ranges = <6 4>, <14 4>, <30 2>, <115 2>, <138 1>, <155 11>;
-
-	lcd_bias_en: lcd-bias-en-state {
-		pins = "gpio151";
-		function = "gpio";
-		drive-strength = <2>;
-		bias-disable;
-	};
-
 	panel_rst_n: panel-rst-n-state {
 		pins = "gpio3";
 		function = "gpio";
@@ -218,27 +249,43 @@
 		bias-pull-down;
 	};
 
-	sw_ctrl_default: sw-ctrl-default-state {
-		pins = "gpio88";
+	panel_bl_en: panel-bl-en-state {
+		pins = "gpio91";
 		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
+		output-high;
+	};
+
+	panel_bl_en_suspend: panel-bl-en-suspend-state {
+		pins = "gpio91";
+		function = "gpio";
+		drive-strength = <2>;
 		bias-pull-down;
+		output-low;
 	};
 
-};
-
-&uart0 {
-	status = "okay";
-};
-
-&uart8 {
-	status = "okay";
-
-	bluetooth {
-		vddio-supply = <&vreg_pmu_io>;
-		vddxo-supply = <&vreg_pmu_xo>;
-		vddrf-supply = <&vreg_pmu_rf>;
-		vddch0-supply = <&vreg_pmu_ch0>;
+	lcd_bias_en: lcd-bias-en-state {
+		pins = "gpio151";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
 	};
+
+	rgmii_phy_pwr_default: rgmii-phy-pwr-default-state {
+		pins = "gpio149";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
+		output-low;
+	};
+
+	usb0_intr_state: usb0-intr-state {
+                pins = "gpio136";
+                function = "gpio";
+                drive-strength = <2>;
+                bias-pull-up;
+        };
 };
 
 &usb_1 {
@@ -270,14 +317,28 @@
 	remote-endpoint = <&pm4125_ss_in>;
 };
 
-&wifi {
-	vdd-0.8-cx-mx-supply = <&pm4125_l7>;
-	vdd-1.8-xo-supply = <&vreg_pmu_xo>;
-	vdd-1.3-rfa-supply = <&vreg_pmu_rf>;
-	vdd-3.3-ch0-supply = <&vreg_pmu_ch0>;
-	qcom,calibration-variant = "Shikra_EVK";
-	firmware-name = "cq2390";
+&usb_2_hsphy {
+	vdd-supply = <&pm4125_l12>;
+	vdda-pll-supply = <&pm4125_l13>;
+	vdda-phy-dpdm-supply = <&pm4125_l21>;
 
 	status = "okay";
 };
 
+&usb_2 {
+        dr_mode = "otg";
+
+        port {
+                usb_2_dwc3_hs: endpoint {
+                        remote-endpoint = <&ucsi_ccg_port>;
+                };
+        };
+};
+
+&usb_2_hsphy {
+        vdd-supply = <&pm4125_l12>;
+        vdda-pll-supply = <&pm4125_l13>;
+        vdda-phy-dpdm-supply = <&pm4125_l21>;
+
+        status = "okay";
+};

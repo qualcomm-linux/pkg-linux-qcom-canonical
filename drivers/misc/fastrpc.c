@@ -1112,68 +1112,62 @@ static int fastrpc_create_maps(struct fastrpc_invoke_ctx *ctx)
 	return 0;
 }
 
-static int fastrpc_flush_args(struct fastrpc_invoke_ctx *ctx,
-	union fastrpc_remote_arg *rpra)
+static void fastrpc_flush_args(struct fastrpc_invoke_ctx *ctx)
 {
-	int oix, inbufs, outbufs;
-	struct device *dev = ctx->fl->sctx->dev;
+	union fastrpc_remote_arg *rpra = ctx->rpra;
+	int i, inbufs, outbufs;
 
 	inbufs = REMOTE_SCALARS_INBUFS(ctx->sc);
 	outbufs = REMOTE_SCALARS_OUTBUFS(ctx->sc);
-	for (oix = 0; oix < inbufs+outbufs; ++oix) {
-		int i = ctx->olaps[oix].raix;
-		struct fastrpc_map *map = ctx->maps[i];
 
-		if (i+1 > inbufs)
+	for (i = 0; i < inbufs + outbufs; ++i) {
+		int raix = ctx->olaps[i].raix;
+		struct fastrpc_map *map = ctx->maps[raix];
+
+		if (raix + 1 > inbufs)
 			continue;
-		if (!map)
+		if (!map || !map->buf)
 			continue;
-		if (rpra[i].buf.len && ctx->olaps[oix].mstart) {
-			if (map->buf) {
-				if ((buf_page_size(ctx->olaps[oix].mend -
-				ctx->olaps[oix].mstart)) == map->size ) {
-					dma_buf_begin_cpu_access(map->buf, DMA_TO_DEVICE);
-					dma_buf_end_cpu_access(map->buf, DMA_TO_DEVICE);
-				}
-			}
+
+		if (rpra[raix].buf.len && ctx->olaps[i].mstart) {
+			dma_buf_begin_cpu_access(map->buf, DMA_TO_DEVICE);
+			dma_buf_end_cpu_access(map->buf, DMA_TO_DEVICE);
 		}
 	}
-	return 0;
 }
 
-static int fastrpc_inv_args(struct fastrpc_invoke_ctx *ctx)
+static void fastrpc_inv_args(struct fastrpc_invoke_ctx *ctx)
 {
-	int i, inbufs, outbufs;
-	uint32_t sc = ctx->sc;
 	union fastrpc_remote_arg *rpra = ctx->rpra;
-	struct device *dev = ctx->fl->sctx->dev;
+	int i, inbufs, outbufs;
 
-	inbufs = REMOTE_SCALARS_INBUFS(sc);
-	outbufs = REMOTE_SCALARS_OUTBUFS(sc);
-	for (i = 0; i < inbufs+outbufs; ++i) {
-		int over = ctx->olaps[i].raix;
-		struct fastrpc_map *map = ctx->maps[over];
+	inbufs = REMOTE_SCALARS_INBUFS(ctx->sc);
+	outbufs = REMOTE_SCALARS_OUTBUFS(ctx->sc);
 
-		if (over + 1 <= inbufs)
+	for (i = 0; i < inbufs + outbufs; ++i) {
+		int raix = ctx->olaps[i].raix;
+		struct fastrpc_map *map = ctx->maps[raix];
+
+		if (raix + 1 <= inbufs)
 			continue;
-		if (!rpra[over].buf.len)
+		if (!rpra[raix].buf.len)
 			continue;
-		if (!map)
+		if (!map || !map->buf)
 			continue;
+
+		/*
+		 * Skip invalidation if the argument overlaps with the
+		 * RPC control header page.
+		 */
 		if (((uintptr_t)rpra & PAGE_MASK) ==
-			((uintptr_t)rpra[over].buf.pv & PAGE_MASK))
+			((uintptr_t)rpra[raix].buf.pv & PAGE_MASK))
 			continue;
+
 		if (ctx->olaps[i].mstart) {
-			if (map->buf) {
-				if (((buf_page_size(ctx->olaps[i].mend -
-					ctx->olaps[i].mstart)) == map->size)) {
-					dma_buf_begin_cpu_access(map->buf, DMA_FROM_DEVICE);
-					dma_buf_end_cpu_access(map->buf, DMA_TO_DEVICE);
-				}
-			}
+			dma_buf_begin_cpu_access(map->buf, DMA_FROM_DEVICE);
+			dma_buf_end_cpu_access(map->buf, DMA_TO_DEVICE);
 		}
 	}
-	return 0;
 }
 
 static struct fastrpc_invoke_buf *fastrpc_invoke_buf_start(union fastrpc_remote_arg *pra, int len)
@@ -1300,11 +1294,8 @@ static int fastrpc_get_args(u32 kernel, struct fastrpc_invoke_ctx *ctx)
 		}
 	}
 
-	if (!ctx->fl->sctx->coherent) {
-		err =  fastrpc_flush_args(ctx, rpra);
-		if (err)
-			goto bail;
-	}
+	if (!ctx->fl->sctx->coherent)
+		fastrpc_flush_args(ctx);
 
 	for (i = ctx->nbufs; i < ctx->nscalars; ++i) {
 		list[i].num = ctx->args[i].length ? 1 : 0;
@@ -1494,11 +1485,8 @@ static int fastrpc_internal_invoke(struct fastrpc_user *fl,  u32 kernel,
 	if (err)
 		goto bail;
 
-	if (!fl->sctx->coherent) {
-		err = fastrpc_inv_args(ctx);
-		if (err)
-			goto bail;
-	}
+	if (!fl->sctx->coherent)
+		fastrpc_inv_args(ctx);
 	/* make sure that all CPU memory writes are seen by DSP */
 	dma_wmb();
 	/* Send invoke buffer to remote dsp */
@@ -1528,11 +1516,9 @@ static int fastrpc_internal_invoke(struct fastrpc_user *fl,  u32 kernel,
 
 	/* make sure that all memory writes by DSP are seen by CPU */
 	dma_rmb();
-	if (!fl->sctx->coherent) {
-		err = fastrpc_inv_args(ctx);
-		if (err)
-			goto bail;
-	}
+	if (!fl->sctx->coherent)
+		fastrpc_inv_args(ctx);
+
 	/* populate all the output buffers with results */
 	err = fastrpc_put_args(ctx, kernel);
 	if (err)

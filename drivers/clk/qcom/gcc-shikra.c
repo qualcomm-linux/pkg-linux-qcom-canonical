@@ -123,7 +123,7 @@ static const struct alpha_pll_config gpll10_config = {
 	.vco_mask = GENMASK(21, 20),
 	.main_output_mask = BIT(0),
 	.config_ctl_val = 0x4001055b,
-	.test_ctl_hi1_val = 0x1,
+	.test_ctl_hi_val = 0x1,
 };
 
 static struct clk_alpha_pll gpll10 = {
@@ -156,7 +156,7 @@ static const struct alpha_pll_config gpll11_config = {
 	.vco_mask = GENMASK(21, 20),
 	.main_output_mask = BIT(0),
 	.config_ctl_val = 0x4001055b,
-	.test_ctl_hi1_val = 0x1,
+	.test_ctl_hi_val = 0x1,
 };
 
 static struct clk_alpha_pll gpll11 = {
@@ -361,7 +361,7 @@ static const struct alpha_pll_config gpll8_config = {
 	.post_div_val = BIT(8),
 	.post_div_mask = GENMASK(11, 8),
 	.config_ctl_val = 0x4001055b,
-	.test_ctl_hi1_val = 0x1,
+	.test_ctl_hi_val = 0x1,
 };
 
 static struct clk_alpha_pll gpll8 = {
@@ -1244,6 +1244,8 @@ static struct clk_rcg2 gcc_emac0_ptp_clk_src = {
 };
 
 static const struct freq_tbl ftbl_gcc_emac0_rgmii_clk_src[] = {
+	F(2500000, P_GPLL0_OUT_AUX2, 10, 1, 12),
+	F(25000000, P_GPLL0_OUT_AUX2, 12, 0, 0),
 	F(50000000, P_GPLL0_OUT_AUX2, 6, 0, 0),
 	F(125000000, P_GPLL12_OUT_AUX2, 4, 0, 0),
 	F(250000000, P_GPLL12_OUT_EARLY, 4, 0, 0),
@@ -4326,6 +4328,7 @@ static const struct qcom_reset_map gcc_shikra_resets[] = {
 	[GCC_USB20_BCR] = { 0xb0000 },
 	[GCC_USB30_PRIM_BCR] = { 0x1a000 },
 	[GCC_USB3PHY_PHY_PRIM_SP0_BCR] = { 0x1b008 },
+	[GCC_USB3_DP_PHY_PRIM_BCR] = { 0x1b020 },
 	[GCC_USB3_PHY_PRIM_SP0_BCR] = { 0x1b000 },
 	[GCC_USB_PHY_CFG_AHB2PHY_BCR] = { 0x1d000 },
 	[GCC_VCODEC0_BCR] = { 0x6d034 },
@@ -4340,7 +4343,7 @@ static struct clk_alpha_pll *gcc_shikra_plls[] = {
 	&gpll9,
 };
 
-static u32 gcc_shikra_critical_cbcrs[] = {
+static const u32 gcc_shikra_critical_cbcrs[] = {
 	0x17008, /* GCC_CAMERA_AHB_CLK */
 	0x17028, /* GCC_CAMERA_XO_CLK */
 	0x1700c, /* GCC_DISP_AHB_CLK */
@@ -4375,7 +4378,7 @@ static const struct regmap_config gcc_shikra_regmap_config = {
 	.fast_io = true,
 };
 
-static struct qcom_cc_driver_data gcc_shikra_driver_data = {
+static const struct qcom_cc_driver_data gcc_shikra_driver_data = {
 	.alpha_plls = gcc_shikra_plls,
 	.num_alpha_plls = ARRAY_SIZE(gcc_shikra_plls),
 	.clk_cbcrs = gcc_shikra_critical_cbcrs,

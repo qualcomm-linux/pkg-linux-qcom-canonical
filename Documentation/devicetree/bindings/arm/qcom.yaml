@@ -881,11 +881,7 @@ properties:
 
       - items:
           - enum:
-<<<<<<< HEAD
-=======
-              - arduino,monza
               - qcom,monaco-ac-evk
->>>>>>> 9e9f8be6df0c (FROMLIST: dt-bindings: arm: qcom: Add monaco-ac-evk support)
               - qcom,monaco-evk
               - qcom,qcs8300-ride
           - const: qcom,qcs8300
@@ -924,24 +920,6 @@ properties:
 
       - items:
           - enum:
-              - qcom,shikra-cqm-evk
-          - const: qcom,shikra-cqm-som
-          - const: qcom,shikra
-
-      - items:
-          - enum:
-              - qcom,shikra-cqs-evk
-          - const: qcom,shikra-cqs-som
-          - const: qcom,shikra
-
-      - items:
-          - enum:
-              - qcom,shikra-iqs-evk
-          - const: qcom,shikra-iqs-som
-          - const: qcom,shikra
-
-      - items:
-          - enum:
               - google,blueline
               - google,crosshatch
               - huawei,planck
@@ -962,6 +940,24 @@ properties:
               - xiaomi,beryllium-ebbg
               - xiaomi,polaris
           - const: qcom,sdm845
+
+      - items:
+          - enum:
+              - qcom,shikra-cqm-evk
+          - const: qcom,shikra-cqm-som
+          - const: qcom,shikra
+
+      - items:
+          - enum:
+              - qcom,shikra-cqs-evk
+          - const: qcom,shikra-cqs-som
+          - const: qcom,shikra
+
+      - items:
+          - enum:
+              - qcom,shikra-iqs-evk
+          - const: qcom,shikra-iqs-som
+          - const: qcom,shikra
 
       - items:
           - enum:

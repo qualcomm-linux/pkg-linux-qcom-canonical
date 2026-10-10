@@ -205,7 +205,6 @@ allOf:
           contains:
             enum:
               - qcom,sc7280-llcc
-              - qcom,sdm670-llcc
               - qcom,shikra-llcc
     then:
       properties:

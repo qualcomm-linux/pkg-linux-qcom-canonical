@@ -384,14 +384,12 @@ static const struct qusb2_phy_cfg sdm660_phy_cfg = {
 static const struct qusb2_phy_cfg shikra_phy_cfg = {
 	.tbl            = qcs615_init_tbl,
 	.tbl_num        = ARRAY_SIZE(qcs615_init_tbl),
-	.regs           = ipq6018_regs_layout,
+	.regs           = msm8996_regs_layout,
 
 	.has_pll_test	= true,
 	.se_clk_scheme_default = true,
-	.disable_ctrl   = (CLAMP_N_EN | FREEZIO_N | POWER_DOWN),
+	.disable_ctrl   = CLAMP_N_EN | FREEZIO_N | POWER_DOWN,
 	.mask_core_ready = PLL_LOCKED,
-	.autoresume_en   = BIT(3),
-	.update_tune1_with_efuse = false,
 };
 
 static const struct qusb2_phy_cfg sm6115_phy_cfg = {

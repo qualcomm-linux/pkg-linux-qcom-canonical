@@ -1655,6 +1655,7 @@ static const struct qcom_icc_desc shikra_config_noc = {
 	.nodes = shikra_config_noc_nodes,
 	.num_nodes = ARRAY_SIZE(shikra_config_noc_nodes),
 	.bus_clk_desc = &bus_1_clk,
+	.regmap_cfg = &shikra_config_noc_regmap_config,
 	.keep_alive = true,
 };
 
@@ -1799,20 +1800,13 @@ static const struct qcom_icc_desc shikra_sys_noc = {
 };
 
 static const struct of_device_id shikra_qnoc_of_match[] = {
-	{ .compatible = "qcom,shikra-clk-virt",
-	  .data = &shikra_clk_virt },
-	{ .compatible = "qcom,shikra-config-noc",
-	  .data = &shikra_config_noc },
-	{ .compatible = "qcom,shikra-mc-virt",
-	  .data = &shikra_mc_virt },
-	{ .compatible = "qcom,shikra-mem-noc-core",
-	  .data = &shikra_mem_noc_core },
-	{ .compatible = "qcom,shikra-mmnrt-virt",
-	  .data = &shikra_mmnrt_virt },
-	{ .compatible = "qcom,shikra-mmrt-virt",
-	  .data = &shikra_mmrt_virt },
-	{ .compatible = "qcom,shikra-sys-noc",
-	  .data = &shikra_sys_noc },
+	{ .compatible = "qcom,shikra-clk-virt", .data = &shikra_clk_virt },
+	{ .compatible = "qcom,shikra-config-noc", .data = &shikra_config_noc },
+	{ .compatible = "qcom,shikra-mc-virt", .data = &shikra_mc_virt },
+	{ .compatible = "qcom,shikra-mem-noc-core", .data = &shikra_mem_noc_core },
+	{ .compatible = "qcom,shikra-mmnrt-virt", .data = &shikra_mmnrt_virt },
+	{ .compatible = "qcom,shikra-mmrt-virt", .data = &shikra_mmrt_virt },
+	{ .compatible = "qcom,shikra-sys-noc", .data = &shikra_sys_noc },
 	{ },
 };
 MODULE_DEVICE_TABLE(of, shikra_qnoc_of_match);
@@ -1839,5 +1833,5 @@ static void __exit qnoc_driver_exit(void)
 }
 module_exit(qnoc_driver_exit);
 
-MODULE_DESCRIPTION("Qualcomm SHIKRA NoC driver");
+MODULE_DESCRIPTION("Qualcomm Shikra NoC driver");
 MODULE_LICENSE("GPL");

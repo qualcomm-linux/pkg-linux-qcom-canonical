@@ -9,7 +9,7 @@ title: Qualcomm Shikra Network-On-Chip interconnect
 maintainers:
   - Raviteja Laggyshetty <raviteja.laggyshetty@oss.qualcomm.com>
 
-description: |
+description:
   The Qualcomm Shikra interconnect providers support adjusting the
   bandwidth requirements between the various NoC fabrics.
 
@@ -39,8 +39,7 @@ patternProperties:
       The interconnect providers do not have a separate QoS register space,
       but share parent's space.
 
-    allOf:
-      - $ref: qcom,rpm-common.yaml#
+    $ref: qcom,rpm-common.yaml#
 
     properties:
       compatible:
@@ -75,6 +74,8 @@ allOf:
         clock-names:
           items:
             - const: gpu_axi
+      patternProperties:
+        '^interconnect-[a-z0-9]+$': false
 
   - if:
       properties:
@@ -100,23 +101,20 @@ allOf:
   - if:
       properties:
         compatible:
-          enum:
-            - qcom,sm6115-clk-virt
-            - qcom,sm6115-config-noc
-            - qcom,sm6115-mc-virt
-            - qcom,sm6115-mmrt-virt
-            - qcom,sm6115-mmnrt-virt
+          const: qcom,shikra-config-noc
 
     then:
       properties:
         clocks: false
         clock-names: false
+      patternProperties:
+        '^interconnect-[a-z0-9]+$': false
 
 unevaluatedProperties: false
 
 examples:
   - |
-    system_noc: interconnect@1880000 {
+    interconnect@1880000 {
         compatible = "qcom,shikra-sys-noc";
         reg = <0x01880000 0x6a080>;
         #interconnect-cells = <2>;
@@ -129,37 +127,8 @@ examples:
                       "usb2_axi",
                       "usb3_axi";
 
-        clk_virt: interconnect-clk {
+        interconnect-clk {
             compatible = "qcom,shikra-clk-virt";
             #interconnect-cells = <2>;
         };
-
-        mc_virt: interconnect-mc {
-            compatible = "qcom,shikra-mc-virt";
-            #interconnect-cells = <2>;
-        };
-
-        mmnrt_virt: interconnect-mmnrt {
-            compatible = "qcom,shikra-mmnrt-virt";
-            #interconnect-cells = <2>;
-        };
-
-        mmrt_virt: interconnect-mmrt {
-            compatible = "qcom,shikra-mmrt-virt";
-            #interconnect-cells = <2>;
-        };
-    };
-
-    config_noc: interconnect@1900000 {
-        compatible = "qcom,shikra-config-noc";
-        reg = <0x01900000 0x8080>;
-        #interconnect-cells = <2>;
-    };
-
-    mem_noc: interconnect@d00000 {
-        compatible = "qcom,shikra-mem-noc-core";
-        reg = <0x00d00000 0x43080>;
-        #interconnect-cells = <2>;
-        clocks = <&gcc_ddrss_gpu_axi_clk>;
-        clock-names = "gpu_axi";
     };

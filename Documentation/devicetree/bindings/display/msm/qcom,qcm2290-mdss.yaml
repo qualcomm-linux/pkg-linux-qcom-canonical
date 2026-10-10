@@ -8,7 +8,6 @@ title: Qualcomm QCM2290 and Shikra Display MDSS
 
 maintainers:
   - Loic Poulain <loic.poulain@linaro.org>
-  - Mahadevan P <mahadevan.p@oss.qualcomm.com>
 
 description:
   Device tree bindings for MSM Mobile Display Subsystem(MDSS) that encapsulates
@@ -18,21 +17,13 @@ description:
 
 $ref: /schemas/display/msm/mdss-common.yaml#
 
-select:
-  properties:
-    compatible:
-      contains:
-        enum:
-          - qcom,qcm2290-mdss
-          - qcom,shikra-mdss
-  required:
-    - compatible
-
 properties:
   compatible:
-    enum:
-      - qcom,qcm2290-mdss
-      - qcom,shikra-mdss
+    oneOf:
+      - const: qcom,qcm2290-mdss
+      - items:
+          - const: qcom,shikra-mdss
+          - const: qcom,qcm2290-mdss
 
   clocks:
     items:
@@ -66,9 +57,8 @@ patternProperties:
 
     properties:
       compatible:
-        enum:
-          - qcom,qcm2290-dpu
-          - qcom,shikra-dpu
+        contains:
+          const: qcom,qcm2290-dpu
 
   "^dsi@[0-9a-f]+$":
     type: object
@@ -76,13 +66,8 @@ patternProperties:
 
     properties:
       compatible:
-        oneOf:
-          - items:
-              - const: qcom,qcm2290-dsi-ctrl
-              - const: qcom,mdss-dsi-ctrl
-          - items:
-              - const: qcom,shikra-dsi-ctrl
-              - const: qcom,mdss-dsi-ctrl
+        contains:
+          const: qcom,qcm2290-dsi-ctrl
 
   "^phy@[0-9a-f]+$":
     type: object

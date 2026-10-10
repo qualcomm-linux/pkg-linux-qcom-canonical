@@ -4,11 +4,8 @@
  */
 
 #include <linux/clk-provider.h>
-#include <linux/mod_devicetable.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
-#include <linux/pm_clock.h>
-#include <linux/pm_runtime.h>
 #include <linux/regmap.h>
 
 #include <dt-bindings/clock/qcom,shikra-audiocorecc.h>
@@ -223,6 +220,7 @@ static struct clk_rcg2 audio_core_cc_aif_if3_clk_src = {
 };
 
 static const struct freq_tbl ftbl_audio_core_cc_aud_dma_clk_src[] = {
+	F(38400000, P_AUDIO_CORE_CC_DIG_PLL_OUT_AUX2, 8, 0, 0),
 	F(102400000, P_AUDIO_CORE_CC_DIG_PLL_OUT_AUX2, 3, 0, 0),
 	F(153600000, P_AUDIO_CORE_CC_DIG_PLL_OUT_AUX2, 2, 0, 0),
 	F(307200000, P_AUDIO_CORE_CC_DIG_PLL_OUT_AUX2, 1, 0, 0),
@@ -738,6 +736,11 @@ static struct clk_alpha_pll *audio_core_cc_shikra_plls[] = {
 	&audio_core_cc_dig_pll,
 };
 
+static const struct qcom_cc_driver_data audio_core_cc_shikra_driver_data = {
+	.alpha_plls = audio_core_cc_shikra_plls,
+	.num_alpha_plls = ARRAY_SIZE(audio_core_cc_shikra_plls),
+};
+
 static const struct regmap_config audio_core_cc_shikra_regmap_config = {
 	.reg_bits = 32,
 	.reg_stride = 4,
@@ -746,12 +749,12 @@ static const struct regmap_config audio_core_cc_shikra_regmap_config = {
 	.fast_io = true,
 };
 
-static const struct qcom_reset_map audio_core_cc_shikra_resets[] = {
-	[AUDIO_CORE_CSR_RX_SWR_CGCR] = { 0x1c },
-	[AUDIO_CORE_CSR_TX_SWR_CGCR] = { 0x30 },
+static const struct qcom_reset_map audio_core_csr_shikra_resets[] = {
+	[AUDIO_CORE_CSR_RX_SWR_CGCR] = { 0x1c, 1 },
+	[AUDIO_CORE_CSR_TX_SWR_CGCR] = { 0x30, 1 },
 };
 
-static const struct regmap_config audio_core_cc_shikra_reset_regmap_config = {
+static const struct regmap_config audio_core_csr_shikra_regmap_config = {
 	.name = "audio_core_cc_shikra_reset",
 	.reg_bits = 32,
 	.reg_stride = 4,
@@ -760,15 +763,10 @@ static const struct regmap_config audio_core_cc_shikra_reset_regmap_config = {
 	.max_register = 0x34,
 };
 
-static struct qcom_cc_driver_data audio_core_cc_shikra_driver_data = {
-	.alpha_plls = audio_core_cc_shikra_plls,
-	.num_alpha_plls = ARRAY_SIZE(audio_core_cc_shikra_plls),
-};
-
-static const struct qcom_cc_desc audio_core_cc_shikra_reset_desc = {
-	.config = &audio_core_cc_shikra_reset_regmap_config,
-	.resets = audio_core_cc_shikra_resets,
-	.num_resets = ARRAY_SIZE(audio_core_cc_shikra_resets),
+static const struct qcom_cc_desc audio_core_csr_shikra_desc = {
+	.config = &audio_core_csr_shikra_regmap_config,
+	.resets = audio_core_csr_shikra_resets,
+	.num_resets = ARRAY_SIZE(audio_core_csr_shikra_resets),
 };
 
 static const struct qcom_cc_desc audio_core_cc_shikra_desc = {
@@ -781,24 +779,21 @@ static const struct qcom_cc_desc audio_core_cc_shikra_desc = {
 };
 
 static const struct of_device_id audio_core_cc_shikra_match_table[] = {
-	{ .compatible = "qcom,shikra-cqm-audiocorecc" },
-	{ .compatible = "qcom,shikra-cqs-audiocorecc" },
+	{ .compatible = "qcom,shikra-audiocorecc", .data = &audio_core_cc_shikra_desc },
+	{ .compatible = "qcom,shikra-audiocore-csr", .data = &audio_core_csr_shikra_desc },
 	{ }
 };
 MODULE_DEVICE_TABLE(of, audio_core_cc_shikra_match_table);
 
 static int audio_core_cc_shikra_probe(struct platform_device *pdev)
 {
-	int ret;
+	const struct qcom_cc_desc *desc;
 
-	ret = qcom_cc_probe_by_index(pdev, 1, &audio_core_cc_shikra_reset_desc);
-	if (ret)
-		return ret;
+	desc = device_get_match_data(&pdev->dev);
+	if (!desc)
+		return -EINVAL;
 
-	if (device_is_compatible(&pdev->dev, "qcom,shikra-cqs-audiocorecc"))
-		return 0;
-
-	return qcom_cc_probe(pdev, &audio_core_cc_shikra_desc);
+	return qcom_cc_probe(pdev, desc);
 }
 
 static struct platform_driver audio_core_cc_shikra_driver = {

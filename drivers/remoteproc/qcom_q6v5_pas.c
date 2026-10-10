@@ -16,6 +16,7 @@
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
+#include <linux/of_platform.h>
 #include <linux/of_reserved_mem.h>
 #include <linux/platform_device.h>
 #include <linux/pm_domain.h>
@@ -119,6 +120,7 @@ struct qcom_pas {
 	struct qcom_rproc_pdm pdm_subdev;
 	struct qcom_rproc_ssr ssr_subdev;
 	struct qcom_sysmon *sysmon;
+	struct platform_device *bam_dmux;
 
 	struct qcom_scm_pas_context *pas_ctx;
 	struct qcom_scm_pas_context *dtb_pas_ctx;
@@ -849,6 +851,7 @@ static int qcom_pas_probe(struct platform_device *pdev)
 	const struct qcom_pas_data *desc;
 	struct qcom_pas *pas;
 	struct rproc *rproc;
+	struct device_node *node;
 	const char *fw_name, *dtb_fw_name = NULL;
 	const struct rproc_ops *ops = &qcom_pas_ops;
 	int ret;
@@ -979,6 +982,10 @@ static int qcom_pas_probe(struct platform_device *pdev)
 	if (ret)
 		goto remove_ssr_sysmon;
 
+	node = of_get_compatible_child(pdev->dev.of_node, "qcom,bam-dmux");
+	pas->bam_dmux = of_platform_device_create(node, NULL, &pdev->dev);
+	of_node_put(node);
+
 	return 0;
 
 remove_ssr_sysmon:
@@ -1002,6 +1009,9 @@ free_rproc:
 static void qcom_pas_remove(struct platform_device *pdev)
 {
 	struct qcom_pas *pas = platform_get_drvdata(pdev);
+
+	if (pas->bam_dmux)
+		of_platform_device_destroy(&pas->bam_dmux->dev, NULL);
 
 	rproc_del(pas->rproc);
 
@@ -1582,7 +1592,7 @@ static const struct qcom_pas_data shikra_cdsp_resource = {
 	.firmware_name = "cdsp.mbn",
 	.pas_id = 18,
 	.minidump_id = 7,
-	.auto_boot = false,
+	.auto_boot = true,
 	.proxy_pd_names = (char *[]){
 		"cx",
 		NULL
@@ -1592,7 +1602,6 @@ static const struct qcom_pas_data shikra_cdsp_resource = {
 	.sysmon_name = "cdsp",
 	.ssctl_id = 0x17,
 	.smem_host_id = 5,
-	.region_assign_vmid = QCOM_SCM_VMID_CDSP,
 };
 
 static const struct qcom_pas_data shikra_lpaicp_resource = {
@@ -1601,7 +1610,6 @@ static const struct qcom_pas_data shikra_lpaicp_resource = {
 	.dtb_firmware_name = "lpaicp_dtb.mbn",
 	.pas_id = 0x56,
 	.dtb_pas_id = 0x57,
-	/* placeholder for lpaicp subsystem dump collection id to be added */
 	.minidump_id = 0,
 	.auto_boot = true,
 	.ssr_name = "lpaicp",
@@ -1614,7 +1622,6 @@ static const struct qcom_pas_data shikra_mpss_resource = {
 	.pas_id = 4,
 	.minidump_id = 3,
 	.auto_boot = false,
-	.decrypt_shutdown = true,
 	.proxy_pd_names = (char *[]){
 		"cx",
 		NULL
@@ -1623,7 +1630,6 @@ static const struct qcom_pas_data shikra_mpss_resource = {
 	.ssr_name = "mpss",
 	.sysmon_name = "modem",
 	.ssctl_id = 0x12,
-	.region_assign_vmid = QCOM_SCM_VMID_MSS_MSA,
 };
 
 static const struct qcom_pas_data sm8650_cdsp_resource = {
@@ -1717,17 +1723,19 @@ static const struct qcom_pas_data kaanapali_soccp_resource = {
 };
 
 static const struct of_device_id qcom_pas_of_match[] = {
-	{ .compatible = "qcom,milos-adsp-pas", .data = &sm8550_adsp_resource},
-	{ .compatible = "qcom,milos-cdsp-pas", .data = &milos_cdsp_resource},
-	{ .compatible = "qcom,milos-mpss-pas", .data = &sm8450_mpss_resource},
-	{ .compatible = "qcom,milos-wpss-pas", .data = &sc7280_wpss_resource},
-	{ .compatible = "qcom,msm8226-adsp-pil", .data = &msm8996_adsp_resource},
-	{ .compatible = "qcom,msm8953-adsp-pil", .data = &msm8996_adsp_resource},
-	{ .compatible = "qcom,msm8974-adsp-pil", .data = &msm8996_adsp_resource},
-	{ .compatible = "qcom,msm8996-adsp-pil", .data = &msm8996_adsp_resource},
-	{ .compatible = "qcom,msm8996-slpi-pil", .data = &msm8996_slpi_resource_init},
-	{ .compatible = "qcom,msm8998-adsp-pas", .data = &msm8996_adsp_resource},
-	{ .compatible = "qcom,msm8998-slpi-pas", .data = &msm8996_slpi_resource_init},
+	{ .compatible = "qcom,eliza-adsp-pas", .data = &sm8550_adsp_resource },
+	{ .compatible = "qcom,kaanapali-soccp-pas", .data = &kaanapali_soccp_resource },
+	{ .compatible = "qcom,milos-adsp-pas", .data = &sm8550_adsp_resource },
+	{ .compatible = "qcom,milos-cdsp-pas", .data = &milos_cdsp_resource },
+	{ .compatible = "qcom,milos-mpss-pas", .data = &sm8450_mpss_resource },
+	{ .compatible = "qcom,milos-wpss-pas", .data = &sc7280_wpss_resource },
+	{ .compatible = "qcom,msm8226-adsp-pil", .data = &msm8996_adsp_resource },
+	{ .compatible = "qcom,msm8953-adsp-pil", .data = &msm8996_adsp_resource },
+	{ .compatible = "qcom,msm8974-adsp-pil", .data = &msm8996_adsp_resource },
+	{ .compatible = "qcom,msm8996-adsp-pil", .data = &msm8996_adsp_resource },
+	{ .compatible = "qcom,msm8996-slpi-pil", .data = &msm8996_slpi_resource_init },
+	{ .compatible = "qcom,msm8998-adsp-pas", .data = &msm8996_adsp_resource },
+	{ .compatible = "qcom,msm8998-slpi-pas", .data = &msm8996_slpi_resource_init },
 	{ .compatible = "qcom,qcs404-adsp-pas", .data = &adsp_resource_init },
 	{ .compatible = "qcom,qcs404-cdsp-pas", .data = &cdsp_resource_init },
 	{ .compatible = "qcom,qcs404-wcss-pas", .data = &wcss_resource_init },
@@ -1756,9 +1764,9 @@ static const struct of_device_id qcom_pas_of_match[] = {
 	{ .compatible = "qcom,sdm845-slpi-pas", .data = &sdm845_slpi_resource_init},
 	{ .compatible = "qcom,sdx55-mpss-pas", .data = &sdx55_mpss_resource},
 	{ .compatible = "qcom,sdx75-mpss-pas", .data = &sm8650_mpss_resource},
-	{ .compatible = "qcom,shikra-cdsp-pas", .data = &shikra_cdsp_resource },
-	{ .compatible = "qcom,shikra-lpaicp-pas", .data = &shikra_lpaicp_resource },
-	{ .compatible = "qcom,shikra-mpss-pas", .data = &shikra_mpss_resource },
+	{ .compatible = "qcom,shikra-cdsp-pas", .data = &shikra_cdsp_resource},
+	{ .compatible = "qcom,shikra-lpaicp-pas", .data = &shikra_lpaicp_resource},
+	{ .compatible = "qcom,shikra-mpss-pas", .data = &shikra_mpss_resource},
 	{ .compatible = "qcom,sm6115-adsp-pas", .data = &adsp_resource_init},
 	{ .compatible = "qcom,sm6115-cdsp-pas", .data = &cdsp_resource_init},
 	{ .compatible = "qcom,sm6115-mpss-pas", .data = &sc8180x_mpss_resource},

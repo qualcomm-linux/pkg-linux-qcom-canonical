@@ -11,8 +11,8 @@ maintainers:
   - Komal Bajaj <komal.bajaj@oss.qualcomm.com>
 
 description:
-  Qualcomm Shikra SoC Peripheral Authentication Service loads and boots firmware
-  on the Qualcomm DSP Hexagon cores.
+  Qualcomm Shikra SoC Peripheral Authentication Service loads and boots
+  firmware on the Qualcomm DSP Hexagon cores.
 
 properties:
   compatible:
@@ -43,6 +43,30 @@ properties:
     items:
       - description: Firmware name of the Hexagon core
       - description: Firmware name of the Hexagon Devicetree
+
+  glink-edge:
+    $ref: /schemas/remoteproc/qcom,glink-edge.yaml#
+    description:
+      Qualcomm G-Link subnode which represents communication edge, channels
+      and devices related to the remoteproc core.
+    unevaluatedProperties: false
+
+  qcom,smem-states:
+    $ref: /schemas/types.yaml#/definitions/phandle-array
+    description: States used by the AP to signal the Hexagon core
+    items:
+      - description: Stop the remote processor
+        items:
+          - description: Phandle to the Shared Memory Point 2 Point device
+              handling the communication with a remote processor
+          - description: Single bit index to toggle in the value sent to
+              the remote processor
+            maximum: 32
+
+  qcom,smem-state-names:
+    description: The names of the state bits used for SMP2P output
+    items:
+      - const: stop
 
 required:
   - compatible
@@ -90,6 +114,8 @@ allOf:
           minItems: 2
         firmware-name:
           minItems: 2
+        power-domains: false
+        power-domain-names: false
 
 unevaluatedProperties: false
 
@@ -120,8 +146,6 @@ examples:
         clock-names = "xo";
 
         interconnects = <&mem_noc MASTER_AMPSS_M0 RPM_ALWAYS_TAG
-                         &mc_virt SLAVE_EBI_CH0 RPM_ALWAYS_TAG>,
-                        <&system_noc MASTER_CRYPTO_CORE0 RPM_ALWAYS_TAG
                          &mc_virt SLAVE_EBI_CH0 RPM_ALWAYS_TAG>;
 
         power-domains = <&rpmpd RPMHPD_CX>;
@@ -131,6 +155,8 @@ examples:
 
         qcom,smem-states = <&cdsp_smp2p_out 0>;
         qcom,smem-state-names = "stop";
+
+        firmware-name = "qcom/shikra/cdsp.mbn";
 
         glink-edge {
             interrupts = <GIC_SPI 261 IRQ_TYPE_EDGE_RISING>;
